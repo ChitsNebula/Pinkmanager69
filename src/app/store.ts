@@ -80,6 +80,7 @@ export function getStoredData() {
       logs: DEFAULT_LOGS,
       controllers: [] as string[],
       standOpen: false,
+      standLocked: false,
       specialDuties: DEFAULT_SPECIAL_DUTIES,
       athleteQr: { qrCode: '', lineLink: '' }
     };
@@ -91,6 +92,7 @@ export function getStoredData() {
   
   const controllersRaw = localStorage.getItem('pink69_controllers');
   const standOpenRaw = localStorage.getItem('pink69_stand_open');
+  const standLockedRaw = localStorage.getItem('pink69_stand_locked');
   const specialDutiesRaw = localStorage.getItem('pink69_special_duties');
   const athleteQrRaw = localStorage.getItem('pink69_athlete_qr');
 
@@ -102,6 +104,7 @@ export function getStoredData() {
   const defaultControllers = ['39967', '39998']; // Default ม.5 controllers
   const controllers: string[] = controllersRaw ? JSON.parse(controllersRaw) : defaultControllers;
   const standOpen: boolean = standOpenRaw ? JSON.parse(standOpenRaw) : false;
+  const standLocked: boolean = standLockedRaw ? JSON.parse(standLockedRaw) : false;
   const specialDuties: SpecialDuty[] = specialDutiesRaw ? JSON.parse(specialDutiesRaw) : DEFAULT_SPECIAL_DUTIES;
   const athleteQr = athleteQrRaw ? JSON.parse(athleteQrRaw) : { qrCode: '', lineLink: '' };
 
@@ -131,7 +134,7 @@ export function getStoredData() {
     return s;
   });
 
-  return { students, sports, announcements, logs, controllers, standOpen, specialDuties, athleteQr };
+  return { students, sports, announcements, logs, controllers, standOpen, standLocked, specialDuties, athleteQr };
 }
 
 function saveAll(
@@ -151,6 +154,7 @@ function saveAll(
 export function saveSystemConfig(config: {
   controllers?: string[];
   standOpen?: boolean;
+  standLocked?: boolean;
   specialDuties?: SpecialDuty[];
   athleteQr?: { qrCode: string; lineLink: string };
 }, actor?: Student, action?: string) {
@@ -161,6 +165,9 @@ export function saveSystemConfig(config: {
   }
   if (config.standOpen !== undefined) {
     localStorage.setItem('pink69_stand_open', JSON.stringify(config.standOpen));
+  }
+  if (config.standLocked !== undefined) {
+    localStorage.setItem('pink69_stand_locked', JSON.stringify(config.standLocked));
   }
   if (config.specialDuties !== undefined) {
     localStorage.setItem('pink69_special_duties', JSON.stringify(config.specialDuties));
@@ -402,7 +409,26 @@ export function removeAthleteFromEvent(eventId: string, studentId: string, actor
   saveAll(students, nextSports, announcements, updatedLogs);
 }
 
-// Legacy compatibility � saveStoredData without logs (used by old callers)
+export function removeSportsEvent(eventId: string, actor?: Student) {
+  const { students, sports, announcements, logs } = getStoredData();
+  const event = sports.find((e: SportsEvent) => e.id === eventId);
+  const nextSports = sports.filter((s: SportsEvent) => s.id !== eventId);
+  let updatedLogs = logs;
+  if (actor && event) {
+    const roleLabel = actor.role === 'admin_president' ? 'ประธานสี' : 'พี่ ม.5 (สตาฟ)';
+    updatedLogs = [{
+      id: 'log_' + Date.now(),
+      timestamp: new Date().toISOString(),
+      actorId: actor.id,
+      actorName: actor.fullname,
+      actorRole: roleLabel,
+      action: `ลบรายการแข่งขัน "${event.name}" (${event.category})`,
+    }, ...logs].slice(0, 200);
+  }
+  saveAll(students, nextSports, announcements, updatedLogs);
+}
+
+// Legacy compatibility  saveStoredData without logs (used by old callers)
 export function saveStoredData(students: Student[], sports: SportsEvent[], announcements?: Announcement[]) {
   if (typeof window === 'undefined') return;
   const { logs } = getStoredData();

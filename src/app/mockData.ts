@@ -11,6 +11,7 @@ export interface Student {
   assigned_duty: Duty;
   duty_status: DutyStatus;
   seat?: string; // e.g. A1, B17
+  rejection_reason?: string; // เหตุผลที่ถูกปฏิเสธหน้าที่
 }
 
 export interface SportsEvent {
