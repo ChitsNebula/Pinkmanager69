@@ -29,6 +29,7 @@ import {
   saveSystemConfig,
   subscribe,
   updateStudent,
+  updateMultipleStudents,
 } from './store';
 import { Duty, SportsEvent, Student } from './mockData';
 
@@ -91,6 +92,11 @@ export default function Home() {
   const [showDutyModal, setShowDutyModal] = useState(false);
   const [registryTab, setRegistryTab] = useState<'all_members' | 'requests'>('all_members');
   const [registryCategoryFilter, setRegistryCategoryFilter] = useState<'all' | 'stand' | 'athlete' | 'special'>('all');
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setSelectedStudentIds([]);
+  }, [registrySearch, registryDuty, registryClassroom, registryTab, registryCategoryFilter, currentTab]);
 
   useEffect(() => {
     const unsubscribe = subscribe(() => {
@@ -551,8 +557,8 @@ export default function Home() {
             ['dashboard', 'หน้าหลัก'],
             ['apply', 'สมัครหน้าที่'],
             ['announcements', 'ประกาศ'],
-            ['registry', 'ทะเบียนสี'],
-          ].map(([id, label]) => (
+            isController ? ['registry', 'ทะเบียนสี'] : null,
+          ].filter((item): item is [string, string] => item !== null).map(([id, label]) => (
             <button
               key={id}
               onClick={() => setCurrentTab(id as Tab)}
@@ -837,7 +843,7 @@ export default function Home() {
           </section>
         )}
 
-        {currentTab === 'registry' && (
+        {currentTab === 'registry' && isController && (
           <section className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
@@ -915,10 +921,137 @@ export default function Home() {
               </div>
             </Panel>
 
+            {isController && selectedStudentIds.length > 0 && (
+              <div className="bg-carbon-card border border-pink-primary/30 rounded-2xl p-4 mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg animate-fade-in">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-pink-primary animate-ping" />
+                  <p className="text-sm font-semibold text-white">
+                    เลือกสมาชิกอยู่ <span className="text-pink-primary text-base font-bold">{selectedStudentIds.length}</span> คน
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-text-secondary">ยัดหน้าที่:</span>
+                    <select
+                      id="bulk-duty-select"
+                      defaultValue="none"
+                      className="bg-carbon-dark border border-pink-primary/20 text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-pink-primary text-text-primary cursor-pointer"
+                    >
+                      <option value="none">-- เลือกหน้าที่ --</option>
+                      {dutyOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>{opt.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => {
+                        const selectEl = document.getElementById('bulk-duty-select') as HTMLSelectElement;
+                        const targetDuty = selectEl ? selectEl.value : 'none';
+                        if (targetDuty === 'none') {
+                          alert('กรุณาเลือกหน้าที่ก่อนยัดครับ!');
+                          return;
+                        }
+                        const status = targetDuty === 'none' ? 'none' : 'approved';
+                        if (confirm(`คุณต้องการยัดหน้าที่ "${dutyLabel(targetDuty)}" ให้กับนักเรียนทั้ง ${selectedStudentIds.length} คนใช่หรือไม่?`)) {
+                          updateMultipleStudents(
+                            selectedStudentIds,
+                            { assigned_duty: targetDuty, duty_status: status },
+                            currentUser || undefined,
+                            `แต่งตั้งหน้าที่กลุ่ม "${dutyLabel(targetDuty)}"`
+                          );
+                          setSelectedStudentIds([]);
+                        }
+                      }}
+                      className="bg-pink-primary hover:bg-pink-accent text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95 shadow-md shadow-pink-primary/10"
+                    >
+                      มอบหมายหน้าที่
+                    </button>
+                  </div>
+                  <div className="h-6 w-[1px] bg-pink-primary/10 hidden md:block" />
+                  <button
+                    onClick={() => {
+                      if (confirm(`คุณต้องการอนุมัติคำขอหน้าที่ให้กับนักเรียนที่เลือกทั้ง ${selectedStudentIds.length} คนใช่หรือไม่?`)) {
+                        updateMultipleStudents(
+                          selectedStudentIds,
+                          { duty_status: 'approved', rejection_reason: undefined },
+                          currentUser || undefined,
+                          'อนุมัติหน้าที่กลุ่ม'
+                        );
+                        setSelectedStudentIds([]);
+                      }
+                    }}
+                    className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95"
+                  >
+                    อนุมัติทั้งหมด
+                  </button>
+                  <button
+                    onClick={() => {
+                      const reason = prompt(`กรุณาระบุเหตุผลการปฏิเสธหน้าที่สำหรับนักเรียนทั้ง ${selectedStudentIds.length} คน:`);
+                      if (reason === null) return;
+                      if (!reason.trim()) {
+                        alert('ต้องใส่เหตุผลการปฏิเสธด้วยครับ');
+                        return;
+                      }
+                      updateMultipleStudents(
+                        selectedStudentIds,
+                        { assigned_duty: 'none', duty_status: 'none', rejection_reason: reason.trim(), seat: undefined },
+                        currentUser || undefined,
+                        `ปฏิเสธหน้าที่กลุ่ม (เหตุผล: ${reason.trim()})`
+                      );
+                      setSelectedStudentIds([]);
+                    }}
+                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95"
+                  >
+                    ปฏิเสธทั้งหมด
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm(`ต้องการรีเซ็ตหน้าที่ของนักเรียนทั้ง ${selectedStudentIds.length} คนใช่หรือไม่? (จะกลายเป็นไม่มีหน้าที่)`)) {
+                        updateMultipleStudents(
+                          selectedStudentIds,
+                          { assigned_duty: 'none', duty_status: 'none', seat: undefined, rejection_reason: undefined },
+                          currentUser || undefined,
+                          'รีเซ็ตหน้าที่กลุ่ม'
+                        );
+                        setSelectedStudentIds([]);
+                      }
+                    }}
+                    className="border border-red-500/20 text-red-400 hover:bg-red-500/10 px-3 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95"
+                  >
+                    รีเซ็ตทั้งหมด
+                  </button>
+                  <button
+                    onClick={() => setSelectedStudentIds([])}
+                    className="text-text-secondary hover:text-white px-2 py-2 text-xs"
+                  >
+                    ยกเลิกเลือก
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="bg-carbon-card border border-pink-primary/10 rounded-2xl p-4 overflow-x-auto shadow">
               <table className="w-full text-left border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-pink-primary/10 text-text-secondary">
+                    {isController && (
+                      <th className="py-3 px-4 w-12 text-center">
+                        <input
+                          type="checkbox"
+                          checked={filteredRegistry.length > 0 && filteredRegistry.every((s: Student) => s.role === 'admin_president' || selectedStudentIds.includes(s.id))}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              const ids = filteredRegistry
+                                .filter((s: Student) => s.role !== 'admin_president')
+                                .map((s: Student) => s.id);
+                              setSelectedStudentIds(ids);
+                            } else {
+                              setSelectedStudentIds([]);
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-pink-primary/30 text-pink-primary bg-carbon-dark focus:ring-0 cursor-pointer"
+                        />
+                      </th>
+                    )}
                     <th className="py-3 px-4 font-semibold">ชื่อ-นามสกุล</th>
                     <th className="py-3 px-4 font-semibold">ห้อง</th>
                     <th className="py-3 px-4 font-semibold">หน้าที่</th>
@@ -930,6 +1063,24 @@ export default function Home() {
                 <tbody>
                   {filteredRegistry.map((student: Student) => (
                     <tr key={student.id} className="border-b border-pink-primary/5 hover:bg-carbon-light/20 transition-colors">
+                      {isController && (
+                        <td className="py-3 px-4 text-center">
+                          {student.role !== 'admin_president' ? (
+                            <input
+                              type="checkbox"
+                              checked={selectedStudentIds.includes(student.id)}
+                              onChange={() => {
+                                setSelectedStudentIds(prev =>
+                                  prev.includes(student.id)
+                                    ? prev.filter(id => id !== student.id)
+                                    : [...prev, student.id]
+                                );
+                              }}
+                              className="w-4 h-4 rounded border-pink-primary/30 text-pink-primary bg-carbon-dark focus:ring-0 cursor-pointer"
+                            />
+                          ) : null}
+                        </td>
+                      )}
                       <td className="py-3 px-4 font-semibold">{student.fullname}<span className="block text-[11px] text-text-tertiary">{student.id}</span></td>
                       <td className="py-3 px-4 text-text-secondary">{student.classroom} เลขที่ {student.number}</td>
                       <td className="py-3 px-4 text-pink-primary font-semibold">

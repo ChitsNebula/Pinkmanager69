@@ -293,6 +293,48 @@ export function updateStudent(studentId: string, updates: Partial<Student>, acto
   saveAll(nextStudents, sports, announcements, updatedLogs);
 }
 
+export function updateMultipleStudents(studentIds: string[], updates: Partial<Student>, actor?: Student, logAction?: string) {
+  const { students, sports, announcements, logs } = getStoredData();
+  const targetNames: string[] = [];
+  
+  const nextStudents = students.map((s: Student) => {
+    if (studentIds.includes(s.id)) {
+      targetNames.push(s.fullname);
+      const next = { ...s, ...updates };
+      if (updates.duty_status === 'none' || (updates.assigned_duty === 'none')) {
+        next.assigned_duty = 'none';
+        next.duty_status = 'none';
+        delete next.seat;
+      }
+      return next;
+    }
+    return s;
+  });
+
+  let updatedLogs = logs;
+  if (actor && logAction) {
+    const roleLabel =
+      actor.role === 'admin_president' ? 'ประธานสี' :
+      actor.role === 'staff_m5' ? 'พี่ ม.5 (สตาฟ)' : 'น้อง';
+    const targetsStr = targetNames.length > 3 
+      ? `${targetNames.slice(0, 3).join(', ')} และคนอื่นๆ รวม ${targetNames.length} คน` 
+      : targetNames.join(', ');
+    
+    const newLog: ActivityLog = {
+      id: 'log_' + Date.now(),
+      timestamp: new Date().toISOString(),
+      actorId: actor.id,
+      actorName: actor.fullname,
+      actorRole: roleLabel,
+      action: `${logAction} จำนวน ${studentIds.length} คน`,
+      targetName: targetsStr
+    };
+    updatedLogs = [newLog, ...logs].slice(0, 200);
+  }
+
+  saveAll(nextStudents, sports, announcements, updatedLogs);
+}
+
 // ----------------------------------------------------------
 // Seat helpers
 // ----------------------------------------------------------
