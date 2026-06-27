@@ -73,6 +73,7 @@ import { Panel, StatCard, MiniCount, DutyCard, ErrorBoundary } from '../componen
 import { EditSegmentsModal } from '../components/modals/EditSegmentsModal';
 import { SeatGrid } from '../components/ui/SeatGrid';
 import { Navbar } from '../components/layout/Navbar';
+import { isSupabaseConfigured } from '../lib/supabase';
 import { LoginScreen } from '../components/layout/LoginScreen';
 import { AnnouncementsTab } from '../components/tabs/AnnouncementsTab';
 import { ReportsTab } from '../components/tabs/ReportsTab';
@@ -1038,7 +1039,7 @@ export default function Home() {
     setCurrentTab('dashboard');
   };
 
-  const handleStaffLogin = (e: React.FormEvent) => {
+  const handleStaffLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setStaffError('');
 
@@ -1052,14 +1053,34 @@ export default function Home() {
 
     const isAllowed = data.controllers.includes(staffMember.id) || (data.moderators || []).includes(staffMember.id);
 
-    const expectedPassword = process.env.NEXT_PUBLIC_STAFF_PASSWORD || '123';
-    if (isAllowed && staffPassword === expectedPassword) {
-      setCurrentUserId(staffMember.id);
-      setCurrentTab('admin');
+    if (!isAllowed) {
+      setStaffError('รหัสนักเรียนนี้ไม่มีสิทธิ์เข้าถึงส่วนผู้ควบคุม/ผู้ดูแล');
       return;
     }
 
-    setStaffError('รหัสนักเรียนนี้ไม่มีสิทธิ์เข้าถึงส่วนผู้ควบคุม/ผู้ดูแล หรือรหัสผ่านไม่ถูกต้อง');
+    try {
+      const response = await fetch('/api/auth/staff', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: staffUsername,
+          password: staffPassword,
+        }),
+      });
+
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setCurrentUserId(staffMember.id);
+        setCurrentTab('admin');
+      } else {
+        setStaffError(result.message || 'รหัสผ่าน Staff ไม่ถูกต้อง');
+      }
+    } catch (err) {
+      console.error(err);
+      setStaffError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อตรวจสอบรหัสผ่านได้');
+    }
   };
 
   const handleLogout = () => {
@@ -1402,6 +1423,7 @@ export default function Home() {
         setCurrentTab={setCurrentTab}
         setLightTheme={setLightTheme}
         handleLogout={handleLogout}
+        isSupabaseConnected={isSupabaseConfigured}
       />
 
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">

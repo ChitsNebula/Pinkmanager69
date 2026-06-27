@@ -14,6 +14,7 @@ interface NavbarProps {
   setCurrentTab: (tab: Tab) => void;
   setLightTheme: (light: boolean) => void;
   handleLogout: () => void;
+  isSupabaseConnected?: boolean;
 }
 
 export function Navbar({
@@ -24,6 +25,7 @@ export function Navbar({
   setCurrentTab,
   setLightTheme,
   handleLogout,
+  isSupabaseConnected,
 }: NavbarProps) {
   return (
     <header className="sticky top-0 z-50 glass-nav px-6 py-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -79,6 +81,19 @@ export function Navbar({
         )}
       </nav>
       <div className="flex items-center gap-3">
+        {/* Supabase status indicator */}
+        <div 
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
+            isSupabaseConnected 
+              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+              : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+          }`}
+          title={isSupabaseConnected ? 'เชื่อมต่อฐานข้อมูล Supabase Real-time สำเร็จ' : 'ไม่ได้เชื่อมต่อ Supabase (โหมดออฟไลน์/เซฟลงเครื่อง)'}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${isSupabaseConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+          <span className="hidden md:inline">{isSupabaseConnected ? 'Supabase' : 'Offline'}</span>
+        </div>
+
         <button
           onClick={() => setLightTheme(!lightTheme)}
           className="flex items-center justify-center p-2 rounded-lg bg-carbon-card border border-pink-primary/20 text-pink-primary hover:bg-pink-primary/10 transition-all cursor-pointer select-none"
