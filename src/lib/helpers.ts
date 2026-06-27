@@ -4,6 +4,7 @@
 import React from 'react';
 import { ArmPoseEquipment, SubSegment } from '../app/types';
 import { Song } from '../app/store';
+import { Student } from '../app/mockData';
 
 // ─── Seat Grid Constants ──────────────────────────────────────────────────────
 export const rows = ['I', 'H', 'G', 'F', 'E', 'D', 'C', 'B', 'A'];
@@ -248,4 +249,20 @@ export const getResolvedVisuals = (
     }
   }
   return resolved;
+};
+
+// ─── User Role Label ──────────────────────────────────────────────────────────
+export const roleLabel = (student: Student) => {
+  if (student.role === 'admin_president') return 'ประธานสี';
+  if (student.role === 'staff_m5') return 'ผู้ควบคุม';
+  if (student.role === 'moderator') return 'ผู้ดูแล';
+  if (student.role === 'student_m4') return 'ม.4';
+  if (student.role === 'student_m5') return 'ม.5';
+  if (student.classroom) {
+    const match = student.classroom.match(/ม\s*\.\s*(\d+)/i);
+    if (match) {
+      return `ม.${match[1]}`;
+    }
+  }
+  return 'สมาชิกสี';
 };
