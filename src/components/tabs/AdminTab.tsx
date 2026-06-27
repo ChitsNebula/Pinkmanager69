@@ -1,19 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, X, Image as ImageIcon, Settings, Trash2, User } from 'lucide-react';
 import { Student, SportsEvent } from '../../app/mockData';
-import { SpecialDuty, ActivityLog } from '../../app/store';
+import { SpecialDuty, ActivityLog, getStoredData, saveSystemConfig } from '../../app/store';
 import { Panel } from '../ui';
 import { SeatGrid } from '../ui/SeatGrid';
 import { fileToDataUrl } from '../../lib/helpers';
 
 interface AdminTabProps {
-  data: any;
+  data: ReturnType<typeof getStoredData>;
   currentUser: Student;
   isController: boolean;
   isSuperController: boolean;
-  adminSubTab: 'stand' | 'athlete' | 'procession' | 'special_duty' | 'logs' | 'roles';
-  setAdminSubTab: (tab: 'stand' | 'athlete' | 'procession' | 'special_duty' | 'logs' | 'roles') => void;
-  saveSystemConfig: (config: any, byUser?: Student, actionDesc?: string) => void;
+  saveSystemConfig: typeof saveSystemConfig;
   getSeatOwner: (seatId: string) => Student | undefined;
   handleSeatClick: (row: string, colNum: number) => void;
   addSportsEvent: (name: string, category: string, byUser?: Student) => void;
@@ -29,8 +27,6 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   currentUser,
   isController,
   isSuperController,
-  adminSubTab,
-  setAdminSubTab,
   saveSystemConfig,
   getSeatOwner,
   handleSeatClick,
@@ -41,6 +37,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   handleExportLogsToCSV,
   handleUploadAthletePhoto,
 }) => {
+  const [adminSubTab, setAdminSubTab] = useState<'stand' | 'athlete' | 'procession' | 'special_duty' | 'logs' | 'roles'>('stand');
+
   // Local input states for Athlete QR settings
   const [newAthleteLineLink, setNewAthleteLineLink] = useState(data.athleteQr?.lineLink || '');
   const [newAthleteQr, setNewAthleteQr] = useState(data.athleteQr?.qrCode || '');
@@ -240,7 +238,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         ].filter(Boolean).map(sub => (
           <button
             key={sub!.id}
-            onClick={() => setAdminSubTab(sub!.id as any)}
+            onClick={() => setAdminSubTab(sub!.id as 'stand' | 'athlete' | 'procession' | 'special_duty' | 'logs' | 'roles')}
             className={`px-4 py-2 rounded-xl md:rounded-full text-xs font-bold transition-all ${
               adminSubTab === sub!.id
                 ? 'bg-pink-primary text-white shadow-md shadow-pink-primary/20 scale-105'

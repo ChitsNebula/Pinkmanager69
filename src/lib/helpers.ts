@@ -72,8 +72,7 @@ export const getSegmentText = (seg: { words?: { text: string }[]; text?: string 
   if (seg.words && seg.words.length > 0) {
     return seg.words.map(w => w.text).join('');
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (seg as any).text || '';
+  return seg.text || '';
 };
 
 export const getSegmentTaggedWords = (

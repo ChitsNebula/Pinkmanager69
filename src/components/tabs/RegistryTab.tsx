@@ -1,66 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Plus, Search, X } from 'lucide-react';
-import { Student } from '../../app/mockData';
-import { SpecialDuty } from '../../app/store';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Search, X, Download, Copy, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Student, DutyStatus } from '../../app/mockData';
+import { SpecialDuty, getStoredData, updateStudent, updateMultipleStudents, deleteStudent, importStudentsData } from '../../app/store';
 import { Panel } from '../ui';
 
 interface RegistryTabProps {
-  data: {
-    students: Student[];
-    specialDuties: SpecialDuty[];
-    processionTitle?: string;
-  };
+  data: ReturnType<typeof getStoredData>;
   currentUser: Student;
   isController: boolean;
   isModerator: boolean;
-  registryTab: 'all_members' | 'requests';
-  setRegistryTab: (val: 'all_members' | 'requests') => void;
-  registryCategoryFilter: 'all' | 'stand' | 'athlete' | 'procession' | 'special' | 'no_duty';
-  setRegistryCategoryFilter: (
-    val: 'all' | 'stand' | 'athlete' | 'procession' | 'special' | 'no_duty'
-  ) => void;
-  registrySearch: string;
-  setRegistrySearch: (val: string) => void;
-  registryDuty: string;
-  setRegistryDuty: (val: string) => void;
-  registryClassroom: string;
-  setRegistryClassroom: (val: string) => void;
-  dutyOptions: { id: string; label: string }[];
-  classrooms: string[];
-  selectedStudentIds: string[];
-  setSelectedStudentIds: React.Dispatch<React.SetStateAction<string[]>>;
-  isCheckboxDragActive: boolean;
-  setIsCheckboxDragActive: (val: boolean) => void;
-  checkboxDragMode: 'select' | 'deselect' | null;
-  setCheckboxDragMode: (val: 'select' | 'deselect' | null) => void;
-  filteredRegistry: Student[];
-  updateStudent: (
-    id: string,
-    updates: Partial<Student>,
-    byUser?: Student,
-    actionDesc?: string
-  ) => void;
-  updateMultipleStudents: (
-    ids: string[],
-    updates: Partial<Student>,
-    byUser?: Student,
-    actionDesc?: string
-  ) => void;
-  deleteStudent: (id: string, byUser?: Student) => void;
-  setIsAddMemberOpen: (val: boolean) => void;
-  setIsExportModalOpen: (val: boolean) => void;
-  setIsImportModalOpen: (val: boolean) => void;
-  setNewMemberName: (val: string) => void;
-  setNewMemberNickname: (val: string) => void;
-  setNewMemberRoom: (val: string) => void;
-  setNewMemberNum: (val: string) => void;
-  setNewMemberId: (val: string) => void;
-  setNewMemberError: (val: string) => void;
-  setImportError: (val: string) => void;
-  setImportSuccess: (val: string) => void;
-  setImportText: (val: string) => void;
 }
 
 export function RegistryTab({
@@ -68,41 +18,148 @@ export function RegistryTab({
   currentUser,
   isController,
   isModerator,
-  registryTab,
-  setRegistryTab,
-  registryCategoryFilter,
-  setRegistryCategoryFilter,
-  registrySearch,
-  setRegistrySearch,
-  registryDuty,
-  setRegistryDuty,
-  registryClassroom,
-  setRegistryClassroom,
-  dutyOptions,
-  classrooms,
-  selectedStudentIds,
-  setSelectedStudentIds,
-  isCheckboxDragActive,
-  setIsCheckboxDragActive,
-  checkboxDragMode,
-  setCheckboxDragMode,
-  filteredRegistry,
-  updateStudent,
-  updateMultipleStudents,
-  deleteStudent,
-  setIsAddMemberOpen,
-  setIsExportModalOpen,
-  setIsImportModalOpen,
-  setNewMemberName,
-  setNewMemberNickname,
-  setNewMemberRoom,
-  setNewMemberNum,
-  setNewMemberId,
-  setNewMemberError,
-  setImportError,
-  setImportSuccess,
-  setImportText,
 }: RegistryTabProps) {
+  // Registry Filters and States moved from page.tsx to RegistryTab
+  const [registryTab, setRegistryTab] = useState<'all_members' | 'requests'>('all_members');
+  const [registryCategoryFilter, setRegistryCategoryFilter] = useState<'all' | 'stand' | 'athlete' | 'procession' | 'special' | 'no_duty'>('all');
+  const [registrySearch, setRegistrySearch] = useState('');
+  const [registryDuty, setRegistryDuty] = useState('all');
+  const [registryClassroom, setRegistryClassroom] = useState('all');
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [isCheckboxDragActive, setIsCheckboxDragActive] = useState<boolean>(false);
+  const [checkboxDragMode, setCheckboxDragMode] = useState<'select' | 'deselect' | null>(null);
+
+  // Add Member form state
+  const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberNickname, setNewMemberNickname] = useState('');
+  const [newMemberRoom, setNewMemberRoom] = useState('');
+  const [newMemberNum, setNewMemberNum] = useState('');
+  const [newMemberId, setNewMemberId] = useState('');
+  const [newMemberError, setNewMemberError] = useState('');
+
+  // Import/Export Modal States
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
+  const [importError, setImportError] = useState('');
+  const [importSuccess, setImportSuccess] = useState('');
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Auto-calculated fields
+  const classrooms = useMemo(() => {
+    const set = new Set<string>();
+    data.students.forEach((s: Student) => {
+      if (s.classroom) set.add(s.classroom);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'th'));
+  }, [data.students]);
+
+  const dutyOptions = useMemo(() => {
+    const list = [
+      { id: 'all', label: 'แสดงทั้งหมด' },
+      { id: 'has_duty', label: 'มีหน้าที่แล้ว (Approved)' },
+      { id: 'pending', label: 'รอพิจารณา/รอคัดเลือก' },
+      { id: 'none', label: 'ยังไม่มีหน้าที่' },
+      { id: 'stand', label: 'สแตนด์เชียร์' },
+      { id: 'athlete', label: 'นักกีฬา' },
+      { id: 'procession', label: data.processionTitle || 'ขบวนพาเหรด' },
+    ];
+    data.specialDuties.forEach((sd) => {
+      list.push({ id: sd.id, label: sd.title });
+    });
+    return list;
+  }, [data.specialDuties, data.processionTitle]);
+
+  const filteredRegistry = useMemo(() => {
+    const query = registrySearch.trim().toLowerCase();
+    return data.students.filter((student: Student) => {
+      // 1. Text Search
+      let matchesText = !query;
+      if (query) {
+        const tokens = query.split(/[\s/]+/);
+        
+        if (tokens.length >= 2) {
+          const hasClassroomMatch = tokens.some(tok => 
+            student.classroom.toLowerCase().includes(tok) || 
+            `ม.${tok}`.includes(student.classroom.toLowerCase())
+          );
+          const hasNumberMatch = tokens.some(tok => 
+            student.number === tok || 
+            `เลขที่${tok}`.includes(student.number)
+          );
+          
+          if (hasClassroomMatch && hasNumberMatch) {
+            matchesText = true;
+          }
+        }
+        
+        if (!matchesText) {
+          const searchString = `${student.fullname} ${student.id} ${student.classroom} เลขที่ ${student.number}`.toLowerCase();
+          matchesText = searchString.includes(query) || 
+                        student.classroom.replace(/\s+/g, '').toLowerCase().includes(query.replace(/\s+/g, '')) ||
+                        `${student.classroom}/${student.number}`.toLowerCase().includes(query) ||
+                        `${student.classroom.replace('ม.', '')}/${student.number}`.toLowerCase().includes(query);
+        }
+      }
+
+      // 2. Classroom Selector
+      const matchesClassroom = registryClassroom === 'all' || student.classroom === registryClassroom;
+
+      // 3. Tab: all members vs pending requests
+      let matchesTab = true;
+      if (registryTab === 'requests') {
+        matchesTab = Object.values(student.duties || {}).some(status => status === 'pending_selection');
+      }
+
+      // 4. Category Filter
+      let matchesCategory = true;
+      if (registryCategoryFilter === 'stand') {
+        matchesCategory = student.duties?.['stand'] !== undefined;
+      } else if (registryCategoryFilter === 'athlete') {
+        matchesCategory = student.duties?.['athlete'] !== undefined;
+      } else if (registryCategoryFilter === 'procession') {
+        matchesCategory = student.duties?.['procession'] !== undefined;
+      } else if (registryCategoryFilter === 'special') {
+        const hasSpecial = Object.keys(student.duties || {}).some(k => k !== 'stand' && k !== 'athlete' && k !== 'procession');
+        matchesCategory = hasSpecial;
+      } else if (registryCategoryFilter === 'no_duty') {
+        matchesCategory = !student.duties || !Object.values(student.duties).some(v => v === 'approved');
+      }
+
+      // 5. Normal Duty Selector
+      let matchesDuty = true;
+      if (registryDuty === 'has_duty') {
+        matchesDuty = Object.values(student.duties || {}).some(s => s === 'approved');
+      } else if (registryDuty === 'pending') {
+        matchesDuty = Object.values(student.duties || {}).some(s => s === 'pending_selection');
+      } else if (registryDuty === 'none') {
+        matchesDuty = !student.duties || !Object.values(student.duties || {}).some(s => s === 'approved');
+      } else if (registryDuty !== 'all') {
+        matchesDuty = student.duties?.[registryDuty] !== undefined;
+      }
+
+      return matchesText && matchesClassroom && matchesTab && matchesCategory && matchesDuty;
+    });
+  }, [data.students, registryClassroom, registryDuty, registrySearch, registryTab, registryCategoryFilter]);
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setIsCheckboxDragActive(false);
+      setCheckboxDragMode(null);
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    setSelectedStudentIds([]);
+  }, [registrySearch, registryDuty, registryClassroom, registryTab, registryCategoryFilter]);
+
   // Local Modal States
   const [showSpecialDutiesStatsModal, setShowSpecialDutiesStatsModal] = useState(false);
   const [addDutyConfirmStudent, setAddDutyConfirmStudent] = useState<Student | null>(null);
@@ -114,6 +171,7 @@ export function RegistryTab({
   const [editStudentRoom, setEditStudentRoom] = useState<string>('');
   const [editStudentNum, setEditStudentNum] = useState<string>('');
   const [editStudentId, setEditStudentId] = useState<string>('');
+  const [editStudentError, setEditStudentError] = useState<string>('');
 
   const [resetStudentTarget, setResetStudentTarget] = useState<Student | null>(null);
   const [deleteStudentTarget, setDeleteStudentTarget] = useState<Student | null>(null);
@@ -133,6 +191,285 @@ export function RegistryTab({
       default:
         return duty;
     }
+  };
+
+  const handleImportSubmit = () => {
+    if (!currentUser || !isController) return;
+    setImportError('');
+    setImportSuccess('');
+
+    const text = importText.trim();
+    if (!text) {
+      setImportError('กรุณากรอกหรือวางข้อมูลก่อนกดนำเข้าครับ!');
+      return;
+    }
+
+    setIsImporting(true);
+
+    setTimeout(() => {
+      let parsedStudents: Student[] = [];
+
+      // 1. ลอง Parse เป็น JSON
+      if (text.startsWith('[') && text.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(text);
+          if (Array.isArray(parsed)) {
+            parsedStudents = parsed.map((item: any) => {
+              if (!item.id || !item.fullname) {
+                throw new Error('ข้อมูลนักเรียนต้องมีฟิลด์ รหัสประจำตัว (id) และชื่อ-นามสกุล (fullname)');
+              }
+              let role = item.role;
+              if (!role && item.classroom) {
+                const match = item.classroom.match(/ม\.(\d+)/);
+                if (match) {
+                  const grade = Number(match[1]);
+                  role = grade <= 3 ? 'student_m13' : 'student_m46';
+                } else {
+                  role = 'student_m13';
+                }
+              }
+
+              const assigned_duty = item.assigned_duty || 'none';
+              const duty_status = item.duty_status || 'none';
+              const duties = item.duties || {};
+              if (assigned_duty !== 'none' && !duties[assigned_duty]) {
+                duties[assigned_duty] = duty_status;
+              }
+
+              return {
+                id: String(item.id),
+                fullname: String(item.fullname),
+                classroom: String(item.classroom || ''),
+                number: String(item.number || ''),
+                role: role || 'student_m13',
+                assigned_duty,
+                duty_status,
+                duties,
+                seat: item.seat || undefined,
+                avatar: item.avatar || undefined,
+              } as Student;
+            });
+          } else {
+            setImportError('JSON ต้องเป็นอาร์เรย์ของข้อมูลสมาชิกเท่านั้น');
+            setIsImporting(false);
+            return;
+          }
+        } catch (e: unknown) {
+          setImportError(`การอ่านข้อมูล JSON ผิดพลาด: ${e instanceof Error ? e.message : String(e)}`);
+          setIsImporting(false);
+          return;
+        }
+      } else {
+        // 2. ลอง Parse เป็น CSV หรือ TSV
+        const lines = text.split(/\r?\n/);
+        if (lines.length === 0) {
+          setImportError('ไม่พบข้อมูลในระบบ');
+          setIsImporting(false);
+          return;
+        }
+
+        const firstLine = lines[0];
+        const delimiter = firstLine.includes('\t') ? '\t' : ',';
+        
+        const parsedRows = lines.map(line => {
+          const cells: string[] = [];
+          let inQuotes = false;
+          let currentCell = '';
+          
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"' || char === "'") {
+              inQuotes = !inQuotes;
+            } else if (char === delimiter && !inQuotes) {
+              cells.push(currentCell.trim());
+              currentCell = '';
+            } else {
+              currentCell += char;
+            }
+          }
+          cells.push(currentCell.trim());
+          return cells.map(c => c.replace(/^["']|["']$/g, ''));
+        });
+
+        let idIdx = -1;
+        let nameIdx = -1;
+        let classIdx = -1;
+        let numIdx = -1;
+        let dutyIdx = -1;
+        let statusIdx = -1;
+        let seatIdx = -1;
+        let standIdx = -1;
+        let athleteIdx = -1;
+        let processionIdx = -1;
+        let specialIdx = -1;
+
+        const headers = parsedRows[0].map(h => h.toLowerCase().trim());
+        
+        const idKeys = ['id', 'รหัส', 'ประจำตัว', 'student_id'];
+        const nameKeys = ['fullname', 'name', 'ชื่อ', 'นามสกุล', 'ชื่อ-นามสกุล'];
+        const classKeys = ['class', 'ห้อง', 'เรียน', 'classroom'];
+        const numKeys = ['num', 'เลขที่', 'number', 'class_number', 'seat_no'];
+        const dutyKeys = ['duty', 'หน้าที่', 'assigned_duty'];
+        const statusKeys = ['status', 'สถานะ', 'duty_status'];
+        const seatKeys = ['seat', 'ที่นั่ง'];
+
+        headers.forEach((h, idx) => {
+          if (idKeys.some(k => h.includes(k))) idIdx = idx;
+          else if (nameKeys.some(k => h.includes(k))) nameIdx = idx;
+          else if (classKeys.some(k => h.includes(k))) classIdx = idx;
+          else if (numKeys.some(k => h.includes(k))) numIdx = idx;
+          else if (h.includes('สแตนด์เชียร์') || h.includes('สแตนด์')) standIdx = idx;
+          else if (h.includes('นักกีฬา')) athleteIdx = idx;
+          else if (h.includes('ขบวนพาเหรด') || h.includes('ขบวน')) processionIdx = idx;
+          else if (h.includes('หน้าที่พิเศษ')) specialIdx = idx;
+          else if (dutyKeys.some(k => h.includes(k))) dutyIdx = idx;
+          else if (statusKeys.some(k => h.includes(k))) statusIdx = idx;
+          else if (seatKeys.some(k => h.includes(k))) seatIdx = idx;
+        });
+
+        let hasHeader = idIdx !== -1 && nameIdx !== -1;
+
+        if (!hasHeader) {
+          idIdx = 0;
+          nameIdx = 1;
+          classIdx = 2;
+          numIdx = 3;
+          dutyIdx = 4;
+          statusIdx = 5;
+          seatIdx = 6;
+        }
+
+        const isNewExportFormat = standIdx !== -1 || athleteIdx !== -1 || processionIdx !== -1 || specialIdx !== -1;
+        const startIndex = hasHeader ? 1 : 0;
+        
+        for (let i = startIndex; i < parsedRows.length; i++) {
+          const cells = parsedRows[i];
+          if (cells.length < 2 || !cells[idIdx] || !cells[nameIdx]) continue;
+
+          const studentId = String(cells[idIdx]).trim();
+          const fullname = String(cells[nameIdx]).trim();
+          const classroom = classIdx !== -1 && cells[classIdx] ? String(cells[classIdx]).trim() : '';
+          const number = numIdx !== -1 && cells[numIdx] ? String(cells[numIdx]).trim() : '';
+          const seat = seatIdx !== -1 && cells[seatIdx] ? String(cells[seatIdx]).trim() : '';
+
+          const match = classroom.match(/ม\.(\d+)/);
+          const grade = match ? Number(match[1]) : 1;
+          const role = grade <= 3 ? 'student_m13' : 'student_m46';
+
+          let assigned_duty = 'none';
+          let duty_status = 'none';
+          const duties: Record<string, string> = {};
+
+          if (isNewExportFormat) {
+            if (standIdx !== -1 && cells[standIdx]) {
+              const statusVal = String(cells[standIdx]).trim();
+              if (statusVal !== '-' && statusVal !== '') {
+                const status = statusVal.includes('อนุมัติ') || statusVal.includes('approve') || statusVal.includes('ใช่') ? 'approved' : 'pending_selection';
+                duties['stand'] = status;
+                assigned_duty = 'stand';
+                duty_status = status;
+              }
+            }
+            if (athleteIdx !== -1 && cells[athleteIdx]) {
+              const statusVal = String(cells[athleteIdx]).trim();
+              if (statusVal !== '-' && statusVal !== '') {
+                const status = statusVal.includes('อนุมัติ') || statusVal.includes('approve') || statusVal.includes('ใช่') ? 'approved' : 'pending_selection';
+                duties['athlete'] = status;
+                assigned_duty = 'athlete';
+                duty_status = status;
+              }
+            }
+            if (processionIdx !== -1 && cells[processionIdx]) {
+              const statusVal = String(cells[processionIdx]).trim();
+              if (statusVal !== '-' && statusVal !== '') {
+                const status = statusVal.includes('อนุมัติ') || statusVal.includes('approve') || statusVal.includes('ใช่') ? 'approved' : 'pending_selection';
+                duties['procession'] = status;
+                assigned_duty = 'procession';
+                duty_status = status;
+              }
+            }
+            if (specialIdx !== -1 && cells[specialIdx]) {
+              const specialVal = String(cells[specialIdx]).trim();
+              if (specialVal !== '-' && specialVal !== '') {
+                const parts = specialVal.split(',').map(p => p.trim()).filter(Boolean);
+                parts.forEach(part => {
+                  const subParts = part.split(':').map(sp => sp.trim());
+                  if (subParts.length >= 1) {
+                    const thDuty = subParts[0];
+                    const rawStatus = subParts[1] || 'อนุมัติแล้ว';
+                    
+                    let engDuty = 'staff';
+                    const thLower = thDuty.toLowerCase();
+                    if (thLower.includes('หลีด') || thLower.includes('cheer')) engDuty = 'cheerleader';
+                    else if (thLower.includes('ดรัม') || thLower.includes('drummer') || thLower.includes('major')) engDuty = 'drummer';
+                    else if (thLower.includes('ดุริยางค์') || thLower.includes('band') || thLower.includes('วงโย')) engDuty = 'band';
+                    else if (thLower.includes('กลอง') || thLower.includes('drum')) engDuty = 'drum';
+                    else if (thLower.includes('ถือป้าย')) engDuty = 'drum';
+                    else if (thLower.includes('สตาฟ') || thLower.includes('staff')) engDuty = 'staff';
+                    
+                    const status = rawStatus.includes('รอคัดเลือก') || rawStatus.includes('รออนุมัติ') ? 'pending_selection' : 'approved';
+                    duties[engDuty] = status;
+                    assigned_duty = engDuty;
+                    duty_status = status;
+                  }
+                });
+              }
+            }
+          } else {
+            const rawDuty = dutyIdx !== -1 && cells[dutyIdx] ? String(cells[dutyIdx]).trim() : 'none';
+            const rawStatus = statusIdx !== -1 && cells[statusIdx] ? String(cells[statusIdx]).trim() : 'none';
+
+            const dutyLower = rawDuty.toLowerCase();
+            if (dutyLower.includes('สแตน') || dutyLower.includes('stand')) assigned_duty = 'stand';
+            else if (dutyLower.includes('หลีด') || dutyLower.includes('cheer')) assigned_duty = 'cheerleader';
+            else if (dutyLower.includes('ดรัม') || dutyLower.includes('drummer') || dutyLower.includes('major')) assigned_duty = 'drummer';
+            else if (dutyLower.includes('ดุริยางค์') || dutyLower.includes('band') || dutyLower.includes('ดนตรี')) assigned_duty = 'band';
+            else if (dutyLower.includes('กลอง') || dutyLower.includes('drum')) assigned_duty = 'drum';
+            else if (dutyLower.includes('นักกีฬา') || dutyLower.includes('athlete')) assigned_duty = 'athlete';
+            else if (dutyLower.includes('staff') || dutyLower.includes('สตาฟ') || dutyLower.includes('ผู้ดูแล')) assigned_duty = 'staff';
+
+            const statusLower = rawStatus.toLowerCase();
+            if (statusLower.includes('อนุมัติ') || statusLower.includes('approve') || statusLower.includes('ใช่') || statusLower === 'y') duty_status = 'approved';
+            else if (statusLower.includes('รอ') || statusLower.includes('pending')) duty_status = 'pending_selection';
+
+            if (assigned_duty !== 'none' && duty_status === 'none') {
+              duty_status = 'approved';
+            }
+            if (assigned_duty !== 'none') {
+              duties[assigned_duty] = duty_status;
+            }
+          }
+
+          parsedStudents.push({
+            id: studentId,
+            fullname: fullname,
+            classroom: classroom,
+            number: number,
+            role: role,
+            assigned_duty: assigned_duty,
+            duty_status: duty_status,
+            duties: duties,
+            seat: (seat !== '-' && seat !== '') ? seat : undefined,
+          } as Student);
+        }
+      }
+
+      if (parsedStudents.length === 0) {
+        setImportError('ไม่พบข้อมูลนักเรียนที่ถูกต้อง กรุณาตรวจสอบฟอร์แมตข้อมูลอีกครั้งครับ');
+        setIsImporting(false);
+        return;
+      }
+
+      importStudentsData(parsedStudents, importMode, currentUser);
+      setImportSuccess(`นำเข้าข้อมูลสมาชิกสำเร็จจำนวน ${parsedStudents.length} คน เรียบร้อยแล้ว!`);
+      setImportText('');
+      setIsImporting(false);
+      
+      setTimeout(() => {
+        setIsImportModalOpen(false);
+        setImportSuccess('');
+      }, 1500);
+    }, 500);
   };
 
   return (
@@ -210,18 +547,18 @@ export function RegistryTab({
 
       {/* Separated Category filters (แยกตามหมวดหมู่หน้าที่) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 font-sans">
-        {[
+        {([
           { id: 'all', label: '🗂️ ทุกหมวดหมู่', count: data.students.length },
           { id: 'stand', label: '📣 สแตนเชียร์', count: data.students.filter((s: Student) => s.duties?.['stand'] === 'approved').length },
           { id: 'athlete', label: '🏃 นักกีฬา', count: data.students.filter((s: Student) => s.duties?.['athlete'] === 'approved').length },
           { id: 'procession', label: `🚶 ${data.processionTitle || 'ขบวนพาเหรด'}`, count: data.students.filter((s: Student) => s.duties?.['procession'] === 'approved').length },
           { id: 'special', label: '✨ หน้าที่พิเศษ', count: data.students.filter((s: Student) => Object.keys(s.duties || {}).some(k => k !== 'stand' && k !== 'athlete' && k !== 'procession' && s.duties?.[k] === 'approved')).length },
           { id: 'no_duty', label: '❌ ไม่มีหน้าที่', count: data.students.filter((s: Student) => !Object.values(s.duties || {}).some(v => v === 'approved')).length },
-        ].map((cat) => (
+        ] as const).map((cat) => (
           <button
             key={cat.id}
             onClick={() => {
-              setRegistryCategoryFilter(cat.id as any);
+              setRegistryCategoryFilter(cat.id);
               if (cat.id === 'special') {
                 setShowSpecialDutiesStatsModal(true);
               }
@@ -525,7 +862,7 @@ export function RegistryTab({
                             {isController && !isModerator && (
                               <button
                                 onClick={() => {
-                                  const nextDuties = { ...student.duties, [dutyId]: 'none' as any };
+                                  const nextDuties = { ...student.duties, [dutyId]: 'none' as DutyStatus };
                                   updateStudent(student.id, { duties: nextDuties }, currentUser || undefined, `ถอดถอนหน้าที่ "${dutyLabel(dutyId)}"`);
                                 }}
                                 className="hover:text-red-500 font-bold ml-1 text-[10px] text-text-secondary transition-colors cursor-pointer"
@@ -600,7 +937,7 @@ export function RegistryTab({
                                       alert('ต้องใส่เหตุผลการปฏิเสธด้วยครับ');
                                       return;
                                     }
-                                    const nextDuties = { ...(student.duties || {}), [dutyId]: 'none' as any };
+                                    const nextDuties = { ...(student.duties || {}), [dutyId]: 'none' as DutyStatus };
                                     updateStudent(student.id, { duties: nextDuties, rejection_reason: reason.trim() }, currentUser || undefined, `ปฏิเสธหน้าที่ "${dutyLabel(dutyId)}" (เหตุผล: ${reason.trim()})`);
                                   }}
                                   className="bg-red-500 hover:bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded font-bold transition-all shadow cursor-pointer"
@@ -637,6 +974,7 @@ export function RegistryTab({
                             setEditStudentRoom(student.classroom || '');
                             setEditStudentNum(student.number || '');
                             setEditStudentId(student.id || '');
+                            setEditStudentError('');
                           }}
                           className="text-pink-accent hover:text-pink-primary text-xs font-semibold cursor-pointer"
                           title="แก้ไขชื่อ ห้อง เลขที่"
@@ -851,6 +1189,13 @@ export function RegistryTab({
                 />
               </div>
 
+              {editStudentError && (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl flex items-center gap-2">
+                  <AlertTriangle size={14} className="shrink-0" />
+                  <span>{editStudentError}</span>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => {
@@ -862,22 +1207,34 @@ export function RegistryTab({
                 </button>
                 <button
                   onClick={() => {
+                    setEditStudentError('');
                     const newId = editStudentId.trim();
+                    const cleanName = editStudentName.trim();
+                    const cleanRoom = editStudentRoom.trim();
+                    const cleanNum = editStudentNum.trim();
+                    const cleanNick = editStudentNickname.trim();
+
+                    if (!cleanName) { setEditStudentError('กรุณากรอกชื่อจริง'); return; }
+                    if (!/^[a-zA-Zก-๙\s]+$/.test(cleanName)) { setEditStudentError('ชื่อจริงต้องประกอบด้วยตัวอักษรและช่องว่างเท่านั้น ไม่มีตัวเลขหรืออักขระพิเศษ'); return; }
+                    if (cleanNick && !/^[a-zA-Zก-๙\s]+$/.test(cleanNick)) { setEditStudentError('ชื่อเล่นต้องประกอบด้วยตัวอักษรและช่องว่างเท่านั้น'); return; }
+                    if (!cleanRoom) { setEditStudentError('กรุณากรอกห้องเรียน'); return; }
+                    if (!/^ม\.\d+\/\d+$/.test(cleanRoom)) { setEditStudentError('ห้องเรียนต้องอยู่ในรูปแบบ ม.X/Y เช่น ม.1/8 หรือ ม.4/12'); return; }
+                    if (!cleanNum) { setEditStudentError('กรุณากรอกเลขที่'); return; }
+                    if (!/^\d+$/.test(cleanNum) || Number(cleanNum) <= 0 || Number(cleanNum) > 100) { setEditStudentError('เลขที่ต้องเป็นตัวเลขระหว่าง 1 ถึง 100'); return; }
+                    
                     if (!newId || newId === 'ยังไม่มี' || newId === 'undefined') {
-                      alert('กรุณากรอกเลขประจำตัวนักเรียน');
+                      setEditStudentError('กรุณากรอกเลขประจำตัวนักเรียน');
                       return;
                     }
-                    if (newId.length !== 5 || !/^\d+$/.test(newId)) {
-                      alert('เลขประจำตัวต้องเป็นตัวเลข 5 หลัก');
+                    if (!/^\d{5}$/.test(newId)) {
+                      setEditStudentError('เลขประจำตัวต้องเป็นตัวเลข 5 หลัก');
                       return;
                     }
                     if (newId !== editStudentTarget.id && data.students.some((s: Student) => s.id === newId)) {
-                      alert(`เลขประจำตัว ${newId} นี้มีในระบบอยู่แล้วครับ`);
+                      setEditStudentError(`เลขประจำตัว ${newId} นี้มีในระบบอยู่แล้วครับ`);
                       return;
                     }
 
-                    const cleanName = editStudentName.trim();
-                    const cleanNick = editStudentNickname.trim();
                     const finalFullname = cleanNick ? `${cleanName} (${cleanNick})` : cleanName;
 
                     updateStudent(
@@ -885,8 +1242,8 @@ export function RegistryTab({
                       {
                         id: newId,
                         fullname: finalFullname || editStudentTarget.fullname,
-                        classroom: editStudentRoom.trim() || editStudentTarget.classroom,
-                        number: editStudentNum.trim() || editStudentTarget.number
+                        classroom: cleanRoom || editStudentTarget.classroom,
+                        number: cleanNum || editStudentTarget.number
                       },
                       currentUser || undefined,
                       `แก้ไขข้อมูลสมาชิก (${finalFullname})`
@@ -971,6 +1328,467 @@ export function RegistryTab({
                 className="flex-1 bg-red-600 hover:bg-red-500 text-white py-2.5 rounded-xl text-sm font-bold transition-all shadow-md shadow-red-500/10 text-center cursor-pointer"
               >
                 ยืนยันลบสมาชิก
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add New Member Modal */}
+      {isAddMemberOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn font-sans text-text-primary">
+          <div className="w-full max-w-md bg-carbon-card border border-green-500/20 rounded-3xl p-6 shadow-2xl relative">
+            <button
+              onClick={() => setIsAddMemberOpen(false)}
+              className="absolute top-4 right-4 text-text-secondary hover:text-white transition-colors cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+
+            <h3 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
+              <Plus size={20} className="text-green-400" /> เพิ่มสมาชิกใหม่
+            </h3>
+            <p className="text-xs text-text-secondary mb-5">กรอกข้อมูลสมาชิกที่ต้องการเพิ่มเข้าระบบ</p>
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-text-secondary block mb-1.5 font-semibold">ชื่อจริง <span className="text-red-400">*</span></label>
+                  <input
+                    type="text"
+                    value={newMemberName}
+                    onChange={(e) => setNewMemberName(e.target.value)}
+                    className="w-full bg-carbon-dark border border-pink-primary/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500 text-white"
+                    placeholder="ชื่อ นามสกุล"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-text-secondary block mb-1.5 font-semibold">ชื่อเล่น</label>
+                  <input
+                    type="text"
+                    value={newMemberNickname}
+                    onChange={(e) => setNewMemberNickname(e.target.value)}
+                    className="w-full bg-carbon-dark border border-pink-primary/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500 text-white"
+                    placeholder="เช่น เตโช"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-text-secondary block mb-1.5 font-semibold">ห้องเรียน <span className="text-red-400">*</span></label>
+                  <input
+                    type="text"
+                    value={newMemberRoom}
+                    onChange={(e) => setNewMemberRoom(e.target.value)}
+                    className="w-full bg-carbon-dark border border-pink-primary/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500 text-white"
+                    placeholder="เช่น ม.1/8"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-text-secondary block mb-1.5 font-semibold">เลขที่ <span className="text-red-400">*</span></label>
+                  <input
+                    type="text"
+                    value={newMemberNum}
+                    onChange={(e) => setNewMemberNum(e.target.value)}
+                    className="w-full bg-carbon-dark border border-pink-primary/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500 text-white"
+                    placeholder="เช่น 5"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-text-secondary block mb-1.5 font-semibold">รหัสนักเรียน (5 หลัก) <span className="text-red-400">*</span></label>
+                <input
+                  type="text"
+                  value={newMemberId}
+                  onChange={(e) => setNewMemberId(e.target.value)}
+                  maxLength={5}
+                  className="w-full bg-carbon-dark border border-pink-primary/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500 text-white font-mono"
+                  placeholder="เช่น 42324"
+                />
+              </div>
+
+              {newMemberError && (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl flex items-center gap-2">
+                  <AlertTriangle size={14} />
+                  <span>{newMemberError}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => setIsAddMemberOpen(false)}
+                className="flex-1 bg-carbon-dark hover:bg-carbon-light border border-pink-primary/10 text-text-secondary py-3 rounded-xl text-sm font-bold transition-all cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={() => {
+                  setNewMemberError('');
+                  const name = newMemberName.trim();
+                  const room = newMemberRoom.trim();
+                  const num = newMemberNum.trim();
+                  const id = newMemberId.trim();
+                  const nick = newMemberNickname.trim();
+                  
+                  if (!name) { setNewMemberError('กรุณากรอกชื่อจริง'); return; }
+                  if (!/^[a-zA-Zก-๙\s]+$/.test(name)) { setNewMemberError('ชื่อจริงต้องประกอบด้วยตัวอักษรและช่องว่างเท่านั้น ไม่มีตัวเลขหรืออักขระพิเศษ'); return; }
+                  if (nick && !/^[a-zA-Zก-๙\s]+$/.test(nick)) { setNewMemberError('ชื่อเล่นต้องประกอบด้วยตัวอักษรและช่องว่างเท่านั้น'); return; }
+                  if (!room) { setNewMemberError('กรุณากรอกห้องเรียน'); return; }
+                  if (!/^ม\.\d+\/\d+$/.test(room)) { setNewMemberError('ห้องเรียนต้องอยู่ในรูปแบบ ม.X/Y เช่น ม.1/8 หรือ ม.4/12'); return; }
+                  if (!num) { setNewMemberError('กรุณากรอกเลขที่'); return; }
+                  if (!/^\d+$/.test(num) || Number(num) <= 0 || Number(num) > 100) { setNewMemberError('เลขที่ต้องเป็นตัวเลขระหว่าง 1 ถึง 100'); return; }
+                  if (!id) { setNewMemberError('กรุณากรอกรหัสนักเรียน'); return; }
+                  if (!/^\d{5}$/.test(id)) { setNewMemberError('รหัสนักเรียนต้องเป็นตัวเลข 5 หลักเท่านั้น'); return; }
+                  
+                  if (data.students.some((s: Student) => s.id === id)) {
+                    setNewMemberError(`รหัส ${id} มีในระบบแล้ว`);
+                    return;
+                  }
+                  
+                  const fullname = nick ? `${name} (${nick})` : name;
+                  const gradeMatch = room.match(/ม\.(\d+)/);
+                  const grade = gradeMatch ? Number(gradeMatch[1]) : 1;
+                  const newStudent: Student = {
+                    id,
+                    fullname,
+                    classroom: room,
+                    number: num,
+                    role: grade <= 3 ? 'student_m13' : grade === 4 ? 'student_m4' : 'student_m5',
+                    assigned_duty: 'none',
+                    duty_status: 'none',
+                    duties: {},
+                  };
+                  importStudentsData([newStudent], 'merge', currentUser || undefined);
+                  setIsAddMemberOpen(false);
+                }}
+                className="flex-1 bg-green-600 hover:bg-green-500 text-white py-3 rounded-xl text-sm font-bold transition-all shadow-md shadow-green-600/20 cursor-pointer"
+              >
+                เพิ่มสมาชิก
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Members Modal */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn font-sans text-text-primary">
+          <div className="w-full max-w-lg bg-carbon-card border border-pink-primary/20 rounded-3xl p-6 shadow-2xl relative">
+            {isExporting && (
+              <div className="absolute inset-0 bg-black/75 z-50 flex flex-col items-center justify-center space-y-4 rounded-3xl backdrop-blur-sm animate-fadeIn">
+                <div className="w-12 h-12 rounded-full border-4 border-t-pink-primary border-pink-primary/20 animate-spin" />
+                <p className="text-sm font-bold text-white font-sans">กำลังจัดเตรียมไฟล์เพื่อส่งออก...</p>
+                <p className="text-xs text-text-secondary font-sans">กรุณารอสักครู่ ระบบกำลังจัดฟอร์แมตข้อมูล</p>
+              </div>
+            )}
+            <button
+              onClick={() => setIsExportModalOpen(false)}
+              className="absolute top-4 right-4 text-text-secondary hover:text-white transition-colors cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+
+            <h3 className="text-xl font-bold text-white mb-1 flex items-center gap-2">📤 ส่งออกข้อมูลสมาชิก</h3>
+            <p className="text-xs text-text-secondary mb-5">เลือกรูปแบบที่ต้องการส่งออก — ครอบคลุมข้อมูลสมาชิกทั้ง {data.students.length} คน</p>
+
+            <div className="space-y-3">
+              {/* Export JSON */}
+              <button
+                onClick={() => {
+                  setIsExporting(true);
+                  setTimeout(() => {
+                    const exportData = data.students.map((s: Student) => ({
+                      id: s.id,
+                      fullname: s.fullname,
+                      classroom: s.classroom,
+                      number: s.number,
+                      role: s.role,
+                      duties: s.duties || {},
+                      seat: s.seat || null,
+                    }));
+                    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `pink69_members_${new Date().toISOString().slice(0,10)}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    setIsExporting(false);
+                  }, 800);
+                }}
+                className="w-full bg-carbon-dark/60 hover:bg-carbon-dark border border-pink-primary/10 hover:border-pink-primary/30 text-left px-5 py-4 rounded-2xl transition-all group active:scale-[0.98] cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🗂️</span>
+                  <div>
+                    <p className="font-bold text-white text-sm group-hover:text-pink-accent transition-colors">Export JSON</p>
+                    <p className="text-xs text-text-tertiary mt-0.5">สำหรับนำเข้ากลับเข้าระบบ PINK69 หรือใช้กับเว็บแอปอื่น</p>
+                  </div>
+                  <Download size={16} className="ml-auto text-text-tertiary group-hover:text-pink-accent transition-colors" />
+                </div>
+              </button>
+
+              {/* Export CSV */}
+              <button
+                onClick={() => {
+                  setIsExporting(true);
+                  setTimeout(() => {
+                    const labelMap: Record<string, string> = {
+                      stand: 'สแตนด์เชียร์',
+                      athlete: 'นักกีฬา',
+                      procession: data.processionTitle || 'ขบวนพาเหรด',
+                    };
+                    (data.specialDuties || []).forEach((sd: { id: string; title: string }) => {
+                      labelMap[sd.id] = sd.title;
+                    });
+                    const statusLabel: Record<string, string> = {
+                      approved: 'อนุมัติแล้ว',
+                      pending: 'รอพิจารณา',
+                      pending_selection: 'รอคัดเลือก',
+                      rejected: 'ถูกปฏิเสธ',
+                      none: '-',
+                    };
+                    const headers = ['รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ชื่อเล่น', 'ห้องเรียน', 'เลขที่', 'สแตนด์เชียร์', 'นักกีฬา', 'ขบวนพาเหรด', 'หน้าที่พิเศษ', 'หน้าที่ทั้งหมด', 'ที่นั่งแสตน'];
+                    const rows = data.students.map((s: Student) => {
+                      const nicknameMatch = s.fullname.match(/\(\s*([^)]+?)\s*\)\s*$/);
+                      const nickname = nicknameMatch ? nicknameMatch[1] : '';
+                      const realName = s.fullname.replace(/\s*\([^)]+\)\s*$/, '').trim();
+
+                      const duties = s.duties || {};
+
+                      const allDutiesSummary = Object.entries(duties)
+                        .filter(([, v]) => v === 'approved' || v === 'pending_selection')
+                        .map(([k, v]) => {
+                          const name = labelMap[k] || k;
+                          if (v === 'pending_selection') return `${name} (รอคัดเลือก)`;
+                          return name;
+                        })
+                        .join(', ');
+
+                      const specialDutiesSummary = Object.entries(duties)
+                        .filter(([k]) => k !== 'stand' && k !== 'athlete' && k !== 'procession')
+                        .map(([k, v]) => `${labelMap[k] || k}: ${statusLabel[v] || v}`)
+                        .join(', ');
+
+                      return [
+                        s.id,
+                        realName,
+                        nickname,
+                        s.classroom,
+                        s.number,
+                        statusLabel[duties['stand'] || 'none'] || '-',
+                        statusLabel[duties['athlete'] || 'none'] || '-',
+                        statusLabel[duties['procession'] || 'none'] || '-',
+                        specialDutiesSummary || '-',
+                        allDutiesSummary || '-',
+                        s.seat || '-',
+                      ];
+                    });
+                    const csvContent = [headers, ...rows].map(r => r.map((c: string) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+                    const BOM = '\uFEFF';
+                    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `pink69_members_${new Date().toISOString().slice(0,10)}.csv`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    setIsExporting(false);
+                  }, 800);
+                }}
+                className="w-full bg-carbon-dark/60 hover:bg-carbon-dark border border-pink-primary/10 hover:border-pink-primary/30 text-left px-5 py-4 rounded-2xl transition-all group active:scale-[0.98] cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">📊</span>
+                  <div>
+                    <p className="font-bold text-white text-sm group-hover:text-pink-accent transition-colors">Export CSV</p>
+                    <p className="text-xs text-text-tertiary mt-0.5">เปิดด้วย Excel / Google Sheets ได้เลย รองรับภาษาไทย</p>
+                  </div>
+                  <Download size={16} className="ml-auto text-text-tertiary group-hover:text-pink-accent transition-colors" />
+                </div>
+              </button>
+
+              {/* Copy JSON to clipboard */}
+              <button
+                onClick={() => {
+                  setIsExporting(true);
+                  setTimeout(() => {
+                    const exportData = data.students.map((s: Student) => ({
+                      id: s.id,
+                      fullname: s.fullname,
+                      classroom: s.classroom,
+                      number: s.number,
+                      role: s.role,
+                      duties: s.duties || {},
+                      seat: s.seat || null,
+                    }));
+                    navigator.clipboard.writeText(JSON.stringify(exportData, null, 2)).then(() => {
+                      setIsExporting(false);
+                      alert('✅ คัดลอก JSON ไปยัง Clipboard แล้ว!');
+                    });
+                  }, 800);
+                }}
+                className="w-full bg-carbon-dark/60 hover:bg-carbon-dark border border-pink-primary/10 hover:border-pink-primary/30 text-left px-5 py-4 rounded-2xl transition-all group active:scale-[0.98] cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">📋</span>
+                  <div>
+                    <p className="font-bold text-white text-sm group-hover:text-pink-accent transition-colors">คัดลอก JSON</p>
+                    <p className="text-xs text-text-tertiary mt-0.5">Copy JSON ไปยัง Clipboard เพื่อวางที่อื่นได้เลย</p>
+                  </div>
+                  <Copy size={16} className="ml-auto text-text-tertiary group-hover:text-pink-accent transition-colors" />
+                </div>
+              </button>
+            </div>
+
+            <p className="text-[11px] text-text-tertiary text-center mt-4">ข้อมูลที่ส่งออก ณ วันที่ {new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Import Members Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn font-sans text-text-primary">
+          <div className="w-full max-w-2xl bg-carbon-card border border-pink-primary/20 rounded-3xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            {isImporting && (
+              <div className="absolute inset-0 bg-black/75 z-50 flex flex-col items-center justify-center space-y-4 rounded-3xl backdrop-blur-sm animate-fadeIn">
+                <div className="w-12 h-12 rounded-full border-4 border-t-pink-primary border-pink-primary/20 animate-spin" />
+                <p className="text-sm font-bold text-white font-sans">กำลังนำเข้าข้อมูลสมาชิก...</p>
+                <p className="text-xs text-text-secondary font-sans">กรุณารอสักครู่ ระบบกำลังจัดสรรข้อมูล</p>
+              </div>
+            )}
+            <button
+              onClick={() => setIsImportModalOpen(false)}
+              className="absolute top-4 right-4 text-text-secondary hover:text-white transition-colors cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+
+            <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+              📥 นำเข้าข้อมูลสมาชิกสีชมพู (Google Sheets / CSV)
+            </h3>
+            <p className="text-xs text-text-secondary mb-4">
+              ปรับปรุงและลงทะเบียนข้อมูลนักเรียนทีละหลายๆ คนพร้อมกันอย่างสะดวก
+            </p>
+
+            <div className="space-y-4">
+              <div className="bg-carbon-dark/50 border border-pink-primary/10 rounded-xl p-4 text-xs space-y-2">
+                <p className="font-bold text-pink-accent">💡 รูปแบบคอลัมน์ใน Google Sheets / CSV ที่แนะนำ:</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-text-secondary font-mono bg-carbon-dark/60 p-2.5 rounded-lg border border-pink-primary/5">
+                  <div>A: รหัสประจำตัว (5 หลัก)</div>
+                  <div>B: ชื่อ-นามสกุล</div>
+                  <div>C: ห้องเรียน (เช่น ม.1/8)</div>
+                  <div>D: เลขที่</div>
+                  <div>E: หน้าที่ (เช่น stand, athlete)</div>
+                  <div>F: สถานะ (เช่น approved)</div>
+                  <div>G: ที่นั่ง (เช่น A1)</div>
+                </div>
+              </div>
+
+              <div className="bg-carbon-dark/30 p-3.5 rounded-xl border border-pink-primary/5 space-y-3 text-sm">
+                <span className="font-semibold text-text-secondary block">🔄 โหมดการนำเข้า:</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setImportMode('merge')}
+                    className={`text-left p-3 rounded-xl border transition-all cursor-pointer ${
+                      importMode === 'merge'
+                        ? 'bg-pink-primary/15 border-pink-primary text-text-primary'
+                        : 'bg-carbon-dark/40 border-pink-primary/10 text-text-secondary hover:border-pink-primary/40'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${importMode === 'merge' ? 'border-pink-primary bg-pink-primary' : 'border-text-tertiary'}`} />
+                      <span className="text-xs font-bold">ผสานข้อมูล (Merge)</span>
+                    </div>
+                    <p className="text-[11px] text-text-tertiary leading-relaxed pl-5">
+                      เพิ่มคนใหม่ และอัปเดตข้อมูลเฉพาะคนที่อยู่ในไฟล์ คนที่ไม่ได้อยู่ในไฟล์จะยังคงอยู่ในระบบเหมือนเดิม
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setImportMode('replace')}
+                    className={`text-left p-3 rounded-xl border transition-all cursor-pointer ${
+                      importMode === 'replace'
+                        ? 'bg-red-500/15 border-red-500 text-text-primary'
+                        : 'bg-carbon-dark/40 border-pink-primary/10 text-text-secondary hover:border-red-500/40'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${importMode === 'replace' ? 'border-red-500 bg-red-500' : 'border-text-tertiary'}`} />
+                      <span className="text-xs font-bold">⚠️ เขียนทับทั้งหมด (Replace)</span>
+                    </div>
+                    <p className="text-[11px] text-text-tertiary leading-relaxed pl-5">
+                      ลบข้อมูลทุกคนออกก่อน แล้วใส่ข้อมูลจากไฟล์เข้ามาแทน เหมาะเมื่อต้องการรีเซ็ตรายชื่อใหม่ทั้งหมด
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-text-secondary block">
+                  วางข้อมูลตาราง (TSV จาก Sheets/Excel) หรืออาร์เรย์ JSON:
+                </label>
+                <textarea
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  placeholder={`วางข้อมูลลงที่นี่ เช่น คลุมตารางใน Google Sheet แล้วกด Ctrl+C และมาวางในกล่องนี้ได้ทันที\n\nตัวอย่างข้อมูล:\nรหัสประจำตัว\tชื่อ-นามสกุล\tห้อง\tเลขที่\tหน้าที่\tสถานะ\tที่นั่ง\n42324\tกฤษณพล ถาวงค์ (เตโช)\tม.1/8\t1\tstand\tapproved\tA1`}
+                  className="w-full h-40 bg-carbon-dark border border-pink-primary/10 rounded-xl p-3 text-xs focus:outline-none focus:border-pink-primary text-white font-mono resize-none"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5">
+                <label className="flex items-center gap-1.5 bg-carbon-light/80 hover:bg-carbon-light text-text-primary px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border border-pink-primary/10 active:scale-95">
+                  📂 หรือเลือกไฟล์ข้อมูล (CSV / JSON)
+                  <input
+                    type="file"
+                    accept=".csv,.tsv,.json,.txt"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          setImportText(event.target?.result as string || '');
+                        };
+                        reader.readAsText(file);
+                      }
+                    }}
+                  />
+                </label>
+                <div className="text-[11px] text-text-tertiary">
+                  รองรับไฟล์ .csv, .tsv, .json และ .txt
+                </div>
+              </div>
+
+              {importError && (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl flex items-center gap-2">
+                  <AlertTriangle size={14} />
+                  <span>{importError}</span>
+                </div>
+              )}
+              {importSuccess && (
+                <div className="bg-green-500/10 border border-green-500/20 text-green-400 text-xs p-3 rounded-xl flex items-center gap-2">
+                  <CheckCircle size={14} />
+                  <span>{importSuccess}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setIsImportModalOpen(false)}
+                className="flex-1 bg-carbon-dark hover:bg-carbon-light border border-pink-primary/10 text-text-secondary py-3 rounded-xl text-sm font-bold transition-all cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={handleImportSubmit}
+                className="flex-1 bg-pink-primary hover:bg-pink-accent text-white py-3 rounded-xl text-sm font-bold transition-all shadow-md shadow-pink-primary/20 cursor-pointer"
+              >
+                ยืนยันนำเข้าข้อมูล
               </button>
             </div>
           </div>

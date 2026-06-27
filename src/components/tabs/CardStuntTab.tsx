@@ -74,7 +74,7 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
   // Playback interval
   useEffect(() => {
     if (!isPlaying) return;
-    const currentSong = data.songs.find((s: any) => s.id === selectedSongId);
+    const currentSong = data.songs.find((s: Song) => s.id === selectedSongId);
     if (!currentSong || currentSong.segments.length === 0) { setIsPlaying(false); return; }
     const interval = setInterval(() => {
       const segIdx = activeSegRef.current;
@@ -502,7 +502,7 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
 
                             {/* Practice Mode Simulation for Student */}
                             {currentSong && (() => {
-                              const getSegmentColorStyle = (seg: any) => {
+                              const getSegmentColorStyle = (seg: { visuals: Record<string, string> }) => {
                                 const action = seg.visuals[mySeat] || 'none';
                                 if (isArmPoseString(action)) {
                                   const pose = parseArmPose(action);
@@ -1164,7 +1164,7 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
                           {/* Karaoke/Lyrics Simulation Player */}
                           {(() => {
                             // Helper to get active plate styling
-                            const getSegmentColorStyle = (seg: any) => {
+                             const getSegmentColorStyle = (seg: { visuals: Record<string, string> }) => {
                               let action = 'none';
                               if (!isController && currentUser?.seat) {
                                 action = seg.visuals[currentUser.seat] || 'none';
@@ -1256,7 +1256,7 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
                             const resolvedVisuals = getResolvedVisuals(currentSong, activeSegmentIndex, activeWordIndex);
                             const currentStyle = getSegmentColorStyle({ visuals: resolvedVisuals });
 
-                            const getWordColorStyle = (w: any, seg: any, resolvedVis?: any) => {
+                            const getWordColorStyle = (w: { text: string; isTagged: boolean; visuals?: Record<string, string> }, seg: SongSegment, resolvedVis?: Record<string, string>) => {
                               const visuals = resolvedVis || w.visuals || {};
                               let action = 'none';
                               if (!isController && currentUser?.seat) {

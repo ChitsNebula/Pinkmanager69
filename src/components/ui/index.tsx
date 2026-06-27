@@ -129,3 +129,6 @@ export function DutyCard({
     </div>
   );
 }
+
+export { ErrorBoundary } from './ErrorBoundary';
+

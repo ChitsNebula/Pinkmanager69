@@ -1,11 +1,11 @@
 import React from 'react';
 import { Users, CheckCircle, AlertTriangle, Award } from 'lucide-react';
 import { Student } from '../../app/mockData';
-import { SpecialDuty, Announcement } from '../../app/store';
+import { SpecialDuty, Announcement, getStoredData } from '../../app/store';
 import { Panel } from '../ui';
 
 interface DashboardTabProps {
-  data: any;
+  data: ReturnType<typeof getStoredData>;
   currentUser: Student;
 }
 
