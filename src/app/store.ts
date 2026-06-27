@@ -42,6 +42,16 @@ const DEFAULT_ANNOUNCEMENTS: Announcement[] = [
 
 const DEFAULT_LOGS: ActivityLog[] = [];
 
+export function getRoleLabel(role?: string): string {
+  if (!role) return 'น้อง';
+  if (role === 'admin_president') return 'ประธานสี';
+  if (role === 'staff_m5') return 'ผู้ควบคุม';
+  if (role === 'moderator') return 'ผู้ดูแล';
+  if (role === 'student_m4') return 'พี่ ม.4';
+  if (role === 'student_m5') return 'พี่ ม.5';
+  return 'น้อง';
+}
+
 const LISTENERS = new Set<() => void>();
 
 export function subscribe(listener: () => void) {
@@ -71,6 +81,78 @@ const DEFAULT_SPECIAL_DUTIES: SpecialDuty[] = [
   { id: 'drum', title: 'มือตีกลองสแตนเชียร์', icon: 'R', limit: 6, qrCode: '', lineLink: '' },
 ];
 
+export interface SongWord {
+  text: string;       // เนื้อหาคำ เช่น "ฟ้าน้ำเงิน"
+  isTagged: boolean;  // แปรอักษรในจังหวะนี้ไหม
+  visuals?: Record<string, string>; // seat label -> color/equipment for word-by-word choreo
+}
+
+export interface SongSegment {
+  id: string;
+  words: SongWord[];  // คำทั้งหมดในท่อนนี้ (isTagged=true คือจังหวะแปรอักษร)
+  visuals: Record<string, string>; // seat label (e.g. A1, E8) -> equipment/color name
+}
+
+export interface Song {
+  id: string;
+  title: string;
+  lyrics: string;
+  equipment: string[];
+  segments: SongSegment[];
+  isLocked?: boolean;
+}
+
+export function generateDefaultVisuals(patternType: 'checker' | 'border' | 'split-vertical' | 'split-horizontal') {
+  const visuals: Record<string, string> = {};
+  const rows = ['I', 'H', 'G', 'F', 'E', 'D', 'C', 'B', 'A'];
+  const columns = Array.from({ length: 20 }, (_, i) => i + 1);
+  rows.forEach((row, rIdx) => {
+    columns.forEach((col) => {
+      const label = `${row}${col}`;
+      if (patternType === 'checker') {
+        visuals[label] = (rIdx + col) % 2 === 0 ? 'ชมพู' : 'ขาว';
+      } else if (patternType === 'border') {
+        const isBorder = rIdx === 0 || rIdx === 9 || col === 1 || col === 18;
+        visuals[label] = isBorder ? 'ชมพู' : 'ขาว';
+      } else if (patternType === 'split-vertical') {
+        visuals[label] = col <= 9 ? 'ชมพู' : 'ขาว';
+      } else if (patternType === 'split-horizontal') {
+        visuals[label] = rIdx <= 4 ? 'ขาว' : 'ชมพู';
+      }
+    });
+  });
+  return visuals;
+}
+
+const DEFAULT_SONGS: Song[] = [
+  {
+    id: 'song_1',
+    title: 'เพลงมาร์ชชมพู',
+    lyrics: 'ชมพู สู้ตาย ชมพู เกรียงไกร',
+    equipment: ['ชมพู', 'ขาว', 'ร่ม'],
+    segments: [
+      { id: 'seg_1_1', words: [{ text: 'ชมพู', isTagged: false }], visuals: generateDefaultVisuals('border') },
+      { id: 'seg_1_2', words: [{ text: 'สู้ตาย', isTagged: false }], visuals: generateDefaultVisuals('checker') },
+      { id: 'seg_1_3', words: [{ text: 'ชมพู', isTagged: false }], visuals: generateDefaultVisuals('split-vertical') },
+      { id: 'seg_1_4', words: [{ text: 'เกรียงไกร', isTagged: false }], visuals: generateDefaultVisuals('split-horizontal') }
+    ]
+  }
+];
+
+export interface SystemReport {
+  id: string;
+  studentId: string;
+  studentName: string;
+  classroom: string;
+  number: string;
+  subject: string; // 'name_wrong' | 'classroom_wrong' | 'number_wrong' | 'other'
+  description: string;
+  status: 'pending' | 'resolved';
+  timestamp: string;
+}
+
+const DEFAULT_REPORTS: SystemReport[] = [];
+
 export function getStoredData() {
   if (typeof window === 'undefined') {
     return { 
@@ -79,10 +161,16 @@ export function getStoredData() {
       announcements: DEFAULT_ANNOUNCEMENTS, 
       logs: DEFAULT_LOGS,
       controllers: [] as string[],
+      moderators: [] as string[],
       standOpen: false,
       standLocked: false,
       specialDuties: DEFAULT_SPECIAL_DUTIES,
-      athleteQr: { qrCode: '', lineLink: '' }
+      athleteQr: { qrCode: '', lineLink: '' },
+      processionQr: { qrCode: '', lineLink: '' },
+      processionLimit: 150,
+      processionTitle: 'ขบวนพาเหรด',
+      songs: DEFAULT_SONGS,
+      reports: DEFAULT_REPORTS
     };
   }
   const studentsRaw = localStorage.getItem('pink69_students');
@@ -91,50 +179,316 @@ export function getStoredData() {
   const logsRaw = localStorage.getItem('pink69_logs');
   
   const controllersRaw = localStorage.getItem('pink69_controllers');
+  const moderatorsRaw = localStorage.getItem('pink69_moderators');
   const standOpenRaw = localStorage.getItem('pink69_stand_open');
   const standLockedRaw = localStorage.getItem('pink69_stand_locked');
   const specialDutiesRaw = localStorage.getItem('pink69_special_duties');
   const athleteQrRaw = localStorage.getItem('pink69_athlete_qr');
+  const processionQrRaw = localStorage.getItem('pink69_procession_qr');
+  const processionLimitRaw = localStorage.getItem('pink69_procession_limit');
+  const processionTitleRaw = localStorage.getItem('pink69_procession_title');
+  const songsRaw = localStorage.getItem('pink69_songs');
 
-  const rawStudents = studentsRaw ? JSON.parse(studentsRaw) : INITIAL_STUDENTS;
+  let rawStudents = studentsRaw ? JSON.parse(studentsRaw) : INITIAL_STUDENTS;
+
+  // Auto-migration ม.3/13 v2
+  if (typeof window !== 'undefined') {
+    const isMigrated = localStorage.getItem('pink69_m313_migrated_v2') === 'true';
+    if (!isMigrated) {
+      const nonM313 = rawStudents.filter((s: any) => s.classroom !== 'ม.3/13');
+      const newM313 = INITIAL_STUDENTS.filter((s: any) => s.classroom === 'ม.3/13');
+      rawStudents = [...nonM313, ...newM313];
+      localStorage.setItem('pink69_students', JSON.stringify(rawStudents));
+      localStorage.setItem('pink69_m313_migrated_v2', 'true');
+    }
+  }
   const sports = sportsRaw ? JSON.parse(sportsRaw) : INITIAL_SPORTS;
   const announcements = announcementsRaw ? JSON.parse(announcementsRaw) : DEFAULT_ANNOUNCEMENTS;
   const logs: ActivityLog[] = logsRaw ? JSON.parse(logsRaw) : DEFAULT_LOGS;
 
-  const defaultControllers = ['39967', '39998']; // Default ม.5 controllers
-  const controllers: string[] = controllersRaw ? JSON.parse(controllersRaw) : defaultControllers;
-  const standOpen: boolean = standOpenRaw ? JSON.parse(standOpenRaw) : false;
-  const standLocked: boolean = standLockedRaw ? JSON.parse(standLockedRaw) : false;
-  const specialDuties: SpecialDuty[] = specialDutiesRaw ? JSON.parse(specialDutiesRaw) : DEFAULT_SPECIAL_DUTIES;
-  const athleteQr = athleteQrRaw ? JSON.parse(athleteQrRaw) : { qrCode: '', lineLink: '' };
+  const defaultControllers = ['39967', '39998', '40059']; // Default controllers including farm (40059)
+  let controllers: string[] = controllersRaw ? JSON.parse(controllersRaw) : defaultControllers;
+  let moderators: string[] = moderatorsRaw ? JSON.parse(moderatorsRaw) : [];
 
-  // Make sure admin profile is in students list if not present
-  if (!rawStudents.find((s: Student) => s.role === 'admin_president')) {
-    rawStudents.push({
-      id: 'admin',
-      fullname: 'ประธานสีชมพู (แอดมิน)',
-      classroom: 'ม.5/8',
-      number: '99',
-      role: 'admin_president',
-      assigned_duty: 'staff',
-      duty_status: 'approved'
-    });
+  // Auto-migration: Ensure default controllers are merged into user's localStorage
+  if (typeof window !== 'undefined') {
+    const isControllersMigrated = localStorage.getItem('pink69_controllers_migrated_v2') === 'true';
+    if (!isControllersMigrated) {
+      const merged = Array.from(new Set([...controllers, ...defaultControllers]));
+      controllers = merged;
+      localStorage.setItem('pink69_controllers', JSON.stringify(merged));
+      localStorage.setItem('pink69_controllers_migrated_v2', 'true');
+    }
   }
 
-  // Dynamically map student roles: M.5 students who are NOT in controllers list should be normal students
-  const students = rawStudents.map((s: Student) => {
-    if (s.role === 'admin_president') return s;
-    if (s.classroom && s.classroom.startsWith('ม.5')) {
-      if (controllers.includes(s.id)) {
-        return { ...s, role: 'staff_m5' };
-      } else {
-        return { ...s, role: 'student_m5' };
+  // Auto-migration: Ensure default controller student profiles are in the students list so they have identities
+  if (typeof window !== 'undefined') {
+    const isStudentsControllersMigrated = localStorage.getItem('pink69_students_controllers_migrated_v3') === 'true';
+    if (!isStudentsControllersMigrated) {
+      let nextStudents = [...rawStudents];
+      const defaultControllerProfiles = [
+        {
+          id: "39967",
+          fullname: "กฤติธี แสนคำ (มิวสิค)",
+          classroom: "ม.5/1",
+          number: "1",
+          role: "staff_m5",
+          assigned_duty: "none",
+          duty_status: "none"
+        },
+        {
+          id: "39998",
+          fullname: "เกียรติสกุล กันกา (ไอคิว)",
+          classroom: "ม.5/1",
+          number: "2",
+          role: "staff_m5",
+          assigned_duty: "none",
+          duty_status: "none"
+        }
+      ];
+
+      let hasAdded = false;
+      defaultControllerProfiles.forEach(profile => {
+        if (!nextStudents.some((s: any) => s.id === profile.id)) {
+          nextStudents.push(profile);
+          hasAdded = true;
+        }
+      });
+
+      if (hasAdded) {
+        rawStudents = nextStudents;
+        localStorage.setItem('pink69_students', JSON.stringify(rawStudents));
       }
+      localStorage.setItem('pink69_students_controllers_migrated_v3', 'true');
     }
-    return s;
+
+    const isNicknamesMigrated = localStorage.getItem('pink69_m41_nicknames_migrated_v1') === 'true';
+    if (!isNicknamesMigrated) {
+      const nicknamesM41: Record<string, string> = {
+        "1": "ภูริ",
+        "2": "ฟีฟ่า",
+        "3": "โกเบ",
+        "4": "อูชิ",
+        "5": "มอส",
+        "6": "ปัน",
+        "7": "ข้าวกล้อง",
+        "8": "ทรอย",
+        "9": "คอม",
+        "10": "ต้นก้า",
+        "11": "ธูปหอม",
+        "12": "นาง",
+        "13": "อองฟอง",
+        "14": "ดิ้วตี้",
+        "15": "ต้นหอม",
+        "16": "ใจเอย",
+        "17": "นาย",
+        "18": "กอข้าว",
+        "19": "ก้านพลู",
+        "20": "น้ำว้า",
+        "21": "โปรแกรม",
+        "22": "เปเป้",
+        "23": "อัณณ์",
+        "24": "เอิร์น",
+        "25": "แพนเค้ก",
+        "26": "น้ำขิง",
+        "27": "ข้าวหอม",
+        "28": "ใบบัว",
+        "29": "น้ำหวาน",
+        "30": "ข้าวฟ่าง"
+      };
+      
+      let modified = false;
+      rawStudents = rawStudents.map((s: any) => {
+        if (s.classroom === 'ม.4/1' && nicknamesM41[s.number]) {
+          const nick = nicknamesM41[s.number];
+          if (!s.fullname.includes(`(${nick})`)) {
+            const cleaned = s.fullname.replace(/\s*\([^)]+\)/g, '').trim();
+            modified = true;
+            return { ...s, fullname: `${cleaned} (${nick})` };
+          }
+        }
+        return s;
+      });
+      
+      if (modified) {
+        localStorage.setItem('pink69_students', JSON.stringify(rawStudents));
+      }
+      localStorage.setItem('pink69_m41_nicknames_migrated_v1', 'true');
+    }
+  }
+
+  const standOpen: boolean = standOpenRaw ? JSON.parse(standOpenRaw) : false;
+  const standLocked: boolean = standLockedRaw ? JSON.parse(standLockedRaw) : false;
+  let specialDuties: SpecialDuty[] = specialDutiesRaw ? JSON.parse(specialDutiesRaw) : DEFAULT_SPECIAL_DUTIES;
+  const athleteQr = athleteQrRaw ? JSON.parse(athleteQrRaw) : { qrCode: '', lineLink: '' };
+  const processionQr = processionQrRaw ? JSON.parse(processionQrRaw) : { qrCode: '', lineLink: '' };
+  const processionLimit = processionLimitRaw ? Number(processionLimitRaw) : 150;
+  const processionTitle = processionTitleRaw || 'ขบวนพาเหรด';
+  let songs: Song[] = songsRaw ? JSON.parse(songsRaw) : DEFAULT_SONGS;
+
+  // Auto-migration: แปลง segments.text เดิม → segments.words (v1)
+  if (typeof window !== 'undefined') {
+    const isSongMigrated = localStorage.getItem('pink69_songs_words_v1') === 'true';
+    if (!isSongMigrated) {
+      songs = songs.map((song: any) => ({
+        ...song,
+        segments: (song.segments || []).map((seg: any) => {
+          if (seg.words) return seg; // already migrated
+          return {
+            ...seg,
+            words: [{ text: seg.text || '', isTagged: false }],
+          };
+        }),
+      }));
+      localStorage.setItem('pink69_songs', JSON.stringify(songs));
+      localStorage.setItem('pink69_songs_words_v1', 'true');
+    }
+  }
+  const reportsRaw = localStorage.getItem('pink69_reports');
+  const reports: SystemReport[] = reportsRaw ? JSON.parse(reportsRaw) : DEFAULT_REPORTS;
+
+  // Auto-migration: แทรก นนท์นภัส อภัยกาวี เข้าไปเป็น ม.2/14 เลขที่ 7 และขยับคนอื่น
+  if (typeof window !== 'undefined') {
+    const isNonnaphatInserted = localStorage.getItem('pink69_m214_insert_nonnaphat_v3') === 'true';
+    if (!isNonnaphatInserted) {
+      // ดึงรายชื่อคนอื่นที่ไม่ใช่ ม.2/14
+      const otherStudents = rawStudents.filter((s: any) => s.classroom !== 'ม.2/14');
+      
+      // ดึง ม.2/14 ทั้งหมด (รวม 41750 ถ้ามี)
+      let m214 = rawStudents.filter((s: any) => s.classroom === 'ม.2/14');
+      
+      // ดึง นนท์นภัส (41750)
+      let nonnaphat = m214.find((s: any) => s.id === '41750');
+      if (!nonnaphat) {
+        nonnaphat = {
+          id: "41750",
+          fullname: "นนท์นภัส อภัยกาวี",
+          classroom: "ม.2/14",
+          number: "7",
+          role: "student_m13",
+          assigned_duty: "none",
+          duty_status: "none"
+         };
+      }
+
+      // กรองเอาคน ม.2/14 ที่ไม่ใช่นนท์นภัส
+      const restOfM214 = m214.filter((s: any) => s.id !== '41750');
+
+      // เรียงคนอื่นตามเลขที่เดิม
+      restOfM214.sort((a: any, b: any) => {
+        const numA = parseInt(a.number, 10) || 999;
+        const numB = parseInt(b.number, 10) || 999;
+        return numA - numB;
+      });
+
+      // จัดเรียงใหม่โดยแทรก นนท์นภัส ที่เลขที่ 7
+      const reorderedM214: any[] = [];
+      restOfM214.forEach((s: any, idx: number) => {
+        if (idx < 6) {
+          reorderedM214.push({ ...s, number: String(idx + 1) });
+        } else {
+          reorderedM214.push({ ...s, number: String(idx + 2) }); // ขยับบวก 1 เพื่อเว้นที่ให้เลขที่ 7
+        }
+      });
+
+      // แทรก นนท์นภัส ที่ตำแหน่งที่ 6 (ดัชนี 6 ของอาร์เรย์ ซึ่งจะเป็นเลขที่ 7)
+      nonnaphat.number = "7";
+      reorderedM214.splice(6, 0, nonnaphat);
+
+      // รวมกลับเข้าไป
+      rawStudents = [...otherStudents, ...reorderedM214];
+      localStorage.setItem('pink69_students', JSON.stringify(rawStudents));
+      localStorage.setItem('pink69_m214_insert_nonnaphat_v3', 'true');
+    }
+  }
+
+  // Auto-migration ขบวนพาเหรด v2 (ย้ายจากหน้าที่พิเศษของเดิม ไปเป็น procession)
+  if (typeof window !== 'undefined') {
+    const isMigrated = localStorage.getItem('pink69_procession_migrated_v2') === 'true';
+    if (!isMigrated) {
+      const targetSpecial = specialDuties.find(sd => sd.title.includes('ขบวน'));
+      if (targetSpecial) {
+        const targetId = targetSpecial.id;
+        rawStudents = rawStudents.map((student: Student) => {
+          let next = { ...student };
+          if (next.duties && next.duties[targetId]) {
+            next.duties = { ...next.duties, procession: next.duties[targetId] };
+            delete next.duties[targetId];
+          }
+          if (next.assigned_duty === targetId) {
+            next.assigned_duty = 'procession';
+          }
+          return next;
+        });
+        specialDuties = specialDuties.filter(sd => sd.id !== targetId);
+        localStorage.setItem('pink69_students', JSON.stringify(rawStudents));
+        localStorage.setItem('pink69_special_duties', JSON.stringify(specialDuties));
+      }
+      localStorage.setItem('pink69_procession_migrated_v2', 'true');
+    }
+  }
+
+  // Auto-migration: ป้องกัน ID ซ้ำ หรือ ID เป็นคำว่า "ยังไม่มี" ใน LocalStorage
+  if (typeof window !== 'undefined') {
+    let hasIdCleaned = false;
+    const seenIds = new Set<string>();
+    
+    rawStudents = rawStudents.map((student: any) => {
+      let currentId = student.id ? String(student.id).trim() : '';
+      // เช็คว่า ID เป็นค่าว่าง หรือ "ยังไม่มี" หรือ "undefined" หรือซ้ำ
+      if (!currentId || currentId === 'ยังไม่มี' || currentId === 'undefined' || seenIds.has(currentId)) {
+        // สร้างรหัสสุ่ม 5 หลักที่ไม่ซ้ำ
+        let newId = '';
+        do {
+          newId = String(Math.floor(10000 + Math.random() * 90000));
+        } while (seenIds.has(newId) || rawStudents.some((s: any) => s.id === newId));
+        
+        currentId = newId;
+        hasIdCleaned = true;
+      }
+      seenIds.add(currentId);
+      return { ...student, id: currentId };
+    });
+
+    if (hasIdCleaned) {
+      localStorage.setItem('pink69_students', JSON.stringify(rawStudents));
+    }
+  }
+
+  // Dynamically map student roles:
+  // 1. If student ID is in controllers list, assign 'staff_m5' role (controller)
+  // 2. If student ID is in moderators list, assign 'moderator' role (moderator/staff)
+  // 3. If student is NOT in controllers/moderators list but holds staff/admin role, revert to normal student role
+  const students = rawStudents.map((s: Student) => {
+    let next = { ...s };
+    if (!next.duties) {
+      next.duties = next.assigned_duty && next.assigned_duty !== 'none'
+        ? { [next.assigned_duty]: next.duty_status || 'approved' }
+        : {};
+    }
+    
+    if (controllers.includes(next.id)) {
+      return { ...next, role: 'staff_m5' };
+    }
+
+    if (moderators && moderators.includes(next.id)) {
+      return { ...next, role: 'moderator' };
+    }
+    
+    // Revert controller/president/moderator roles to normal roles if they are not in the active controller/moderator list
+    if (next.role === 'staff_m5' || next.role === 'admin_president' || next.role === 'moderator') {
+      let normalRole = 'student_m13';
+      if (next.classroom) {
+        if (next.classroom.startsWith('ม.5')) normalRole = 'student_m5';
+        else if (next.classroom.startsWith('ม.4')) normalRole = 'student_m4';
+      }
+      return { ...next, role: normalRole };
+    }
+    
+    return next;
   });
 
-  return { students, sports, announcements, logs, controllers, standOpen, standLocked, specialDuties, athleteQr };
+  return { students, sports, announcements, logs, controllers, moderators, standOpen, standLocked, specialDuties, athleteQr, processionQr, processionLimit, processionTitle, songs, reports };
 }
 
 function saveAll(
@@ -151,17 +505,81 @@ function saveAll(
   notify();
 }
 
+export function saveSongs(songs: Song[], actor?: Student, action?: string) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('pink69_songs', JSON.stringify(songs));
+  
+  if (actor && action) {
+    const { logs } = getStoredData();
+    const roleLabel = getRoleLabel(actor.role);
+    
+    const newLog: ActivityLog = {
+      id: 'log_' + Date.now(),
+      timestamp: new Date().toISOString(),
+      actorId: actor.id,
+      actorName: actor.fullname,
+      actorRole: roleLabel,
+      action,
+    };
+    const updatedLogs = [newLog, ...logs].slice(0, 200);
+    localStorage.setItem('pink69_logs', JSON.stringify(updatedLogs));
+  }
+  notify();
+}
+
+export function toggleSongLock(songId: string, actor?: Student): void {
+  if (typeof window === 'undefined') return;
+  if (actor?.role === 'moderator') return;
+  const songsRaw = localStorage.getItem('pink69_songs');
+  if (!songsRaw) return;
+  try {
+    const songs: Song[] = JSON.parse(songsRaw);
+    const updatedSongs = songs.map(s => {
+      if (s.id === songId) {
+        const nextLocked = !s.isLocked;
+        if (actor) {
+          const { logs } = getStoredData();
+          const roleLabel = getRoleLabel(actor.role);
+          const newLog = {
+            id: 'log_' + Date.now(),
+            timestamp: new Date().toISOString(),
+            actorId: actor.id,
+            actorName: actor.fullname,
+            actorRole: roleLabel,
+            action: nextLocked ? `ล็อคเพลง "${s.title}" เพื่อป้องกันการแก้ไข` : `ปลดล็อคเพลง "${s.title}" ให้สามารถแก้ไขได้`
+          };
+          const updatedLogs = [newLog, ...logs].slice(0, 200);
+          localStorage.setItem('pink69_logs', JSON.stringify(updatedLogs));
+        }
+        return { ...s, isLocked: nextLocked };
+      }
+      return s;
+    });
+    localStorage.setItem('pink69_songs', JSON.stringify(updatedSongs));
+    notify();
+  } catch (e) {
+    console.error('Failed to toggle song lock:', e);
+  }
+}
+
 export function saveSystemConfig(config: {
   controllers?: string[];
+  moderators?: string[];
   standOpen?: boolean;
   standLocked?: boolean;
   specialDuties?: SpecialDuty[];
   athleteQr?: { qrCode: string; lineLink: string };
+  processionQr?: { qrCode: string; lineLink: string };
+  processionLimit?: number;
+  processionTitle?: string;
 }, actor?: Student, action?: string) {
   if (typeof window === 'undefined') return;
   
   if (config.controllers !== undefined) {
     localStorage.setItem('pink69_controllers', JSON.stringify(config.controllers));
+  }
+  if (config.moderators !== undefined) {
+    localStorage.setItem('pink69_moderators', JSON.stringify(config.moderators));
   }
   if (config.standOpen !== undefined) {
     localStorage.setItem('pink69_stand_open', JSON.stringify(config.standOpen));
@@ -175,12 +593,19 @@ export function saveSystemConfig(config: {
   if (config.athleteQr !== undefined) {
     localStorage.setItem('pink69_athlete_qr', JSON.stringify(config.athleteQr));
   }
+  if (config.processionQr !== undefined) {
+    localStorage.setItem('pink69_procession_qr', JSON.stringify(config.processionQr));
+  }
+  if (config.processionLimit !== undefined) {
+    localStorage.setItem('pink69_procession_limit', String(config.processionLimit));
+  }
+  if (config.processionTitle !== undefined) {
+    localStorage.setItem('pink69_procession_title', config.processionTitle);
+  }
 
   if (actor && action) {
     const { logs } = getStoredData();
-    const roleLabel =
-      actor.role === 'admin_president' ? 'ประธานสี' :
-      actor.role === 'staff_m5' ? 'พี่ ม.5 (สตาฟ)' : 'น้อง';
+    const roleLabel = getRoleLabel(actor.role);
     
     const newLog: ActivityLog = {
       id: 'log_' + Date.now(),
@@ -202,10 +627,7 @@ export function saveSystemConfig(config: {
 // ----------------------------------------------------------
 export function appendLog(actor: Student, action: string, targetName?: string) {
   const { students, sports, announcements, logs } = getStoredData();
-  const roleLabel =
-    actor.role === 'admin_president' ? 'ประธานสี' :
-    actor.role === 'staff_m5' ? 'พี่ ม.5 (สตาฟ)' :
-    actor.role === 'student_m4' ? 'พี่ ม.4' : 'น้อง ม.1-3';
+  const roleLabel = getRoleLabel(actor.role);
 
   const now = new Date();
 
@@ -235,9 +657,7 @@ export function saveAnnouncements(announcements: Announcement[], actor?: Student
   const { students, sports, logs } = getStoredData();
   let updatedLogs = logs;
   if (actor && action) {
-    const roleLabel =
-      actor.role === 'admin_president' ? 'ประธานสี' :
-      actor.role === 'staff_m5' ? 'พี่ ม.5 (สตาฟ)' : 'น้อง';
+    const roleLabel = getRoleLabel(actor.role);
     const newLog: ActivityLog = {
       id: 'log_' + Date.now(),
       timestamp: new Date().toISOString(),
@@ -255,37 +675,175 @@ export function saveAnnouncements(announcements: Announcement[], actor?: Student
 // ----------------------------------------------------------
 // Student helpers
 // ----------------------------------------------------------
+function syncLegacyDutyFields(student: Student): Student {
+  const next = { ...student };
+  if (!next.duties) next.duties = {};
+  
+  const dutyEntries = Object.entries(next.duties);
+  const approvedEntry = dutyEntries.find(([_, status]) => status === 'approved');
+  if (approvedEntry) {
+    next.assigned_duty = approvedEntry[0];
+    next.duty_status = 'approved';
+  } else {
+    const pendingEntry = dutyEntries.find(([_, status]) => status === 'pending_selection');
+    if (pendingEntry) {
+      next.assigned_duty = pendingEntry[0];
+      next.duty_status = 'pending_selection';
+    } else {
+      next.assigned_duty = 'none';
+      next.duty_status = 'none';
+      delete next.seat;
+    }
+  }
+  return next;
+}
+
 export function updateStudent(studentId: string, updates: Partial<Student>, actor?: Student, logAction?: string) {
+  if (actor?.role === 'moderator' && actor.id !== studentId) return;
   const { students, sports, announcements, logs } = getStoredData();
   const target = students.find((s: Student) => s.id === studentId);
   const nextStudents = students.map((s: Student) => {
     if (s.id === studentId) {
-      const next = { ...s, ...updates };
-      // Business logic validation: If the user is rejected from an athlete or special duty,
-      // reset their assigned duty to none, forcing Stand selection
-      if (updates.duty_status === 'none' || (updates.assigned_duty === 'none')) {
-        next.assigned_duty = 'none';
-        next.duty_status = 'none';
-        delete next.seat;
+      let next = { ...s, ...updates };
+      
+      if (updates.duties) {
+        if (Object.keys(updates.duties).length === 0) {
+          next.duties = {};
+        } else {
+          next.duties = { ...(s.duties || {}), ...updates.duties };
+          Object.keys(next.duties).forEach(k => {
+            if (next.duties![k] === 'none') {
+              delete next.duties![k];
+            }
+          });
+        }
       }
+      
+      if (updates.assigned_duty !== undefined || updates.duty_status !== undefined) {
+        const d = updates.assigned_duty !== undefined ? updates.assigned_duty : s.assigned_duty;
+        const ds = updates.duty_status !== undefined ? updates.duty_status : s.duty_status;
+        if (d === 'none' || ds === 'none') {
+          next.duties = {};
+        } else {
+          next.duties = { ...(s.duties || {}), [d]: ds };
+        }
+      }
+      
+      next = syncLegacyDutyFields(next);
       return next;
     }
     return s;
   });
 
+  // Handle student ID updates across SportsEvent lineups and controllers
+  let nextSports = sports;
+  if (updates.id !== undefined && updates.id !== studentId) {
+    // 1. Update ID in sports lineup
+    nextSports = sports.map((event: SportsEvent) => {
+      if (event.lineup.includes(studentId)) {
+        return {
+          ...event,
+          lineup: event.lineup.map(id => id === studentId ? updates.id! : id)
+        };
+      }
+      return event;
+    });
+
+    // 2. Update ID in controllers
+    if (typeof window !== 'undefined') {
+      const controllersRaw = localStorage.getItem('pink69_controllers');
+      if (controllersRaw) {
+        try {
+          const controllers: string[] = JSON.parse(controllersRaw);
+          if (controllers.includes(studentId)) {
+            const nextControllers = controllers.map(id => id === studentId ? updates.id! : id);
+            localStorage.setItem('pink69_controllers', JSON.stringify(nextControllers));
+          }
+        } catch (e) {
+          console.error('Failed to parse controllers for ID update:', e);
+        }
+      }
+    }
+  }
+
   let updatedLogs = logs;
   if (actor && logAction) {
-    const roleLabel =
-      actor.role === 'admin_president' ? 'ประธานสี' :
-      actor.role === 'staff_m5' ? 'พี่ ม.5 (สตาฟ)' : 'น้อง';
+    const roleLabel = getRoleLabel(actor.role);
+
+    let details: string[] = [];
+    if (updates.fullname !== undefined && updates.fullname !== target?.fullname) {
+      details.push(`ชื่อ: "${target?.fullname || '-'}" -> "${updates.fullname}"`);
+    }
+    if (updates.id !== undefined && updates.id !== target?.id) {
+      details.push(`รหัสประจำตัว: "${target?.id || '-'}" -> "${updates.id}"`);
+    }
+    if (updates.classroom !== undefined && updates.classroom !== target?.classroom) {
+      details.push(`ห้องเรียน: "${target?.classroom || '-'}" -> "${updates.classroom}"`);
+    }
+    if (updates.number !== undefined && updates.number !== target?.number) {
+      details.push(`เลขที่: "${target?.number || '-'}" -> "${updates.number}"`);
+    }
+
+    let finalAction = logAction;
+    if (details.length > 0) {
+      finalAction = `${logAction} [${details.join(', ')}]`;
+    }
+
     const newLog: ActivityLog = {
       id: 'log_' + Date.now(),
       timestamp: new Date().toISOString(),
       actorId: actor.id,
       actorName: actor.fullname,
       actorRole: roleLabel,
-      action: logAction,
+      action: finalAction,
       targetName: target?.fullname
+    };
+    updatedLogs = [newLog, ...logs].slice(0, 200);
+  }
+
+  saveAll(nextStudents, nextSports, announcements, updatedLogs);
+}
+
+export function deleteStudent(studentId: string, actor?: Student) {
+  if (actor?.role === 'moderator') return;
+  const { students, sports, announcements, logs } = getStoredData();
+  const target = students.find((s: Student) => s.id === studentId);
+  let nextStudents = students.filter((s: Student) => s.id !== studentId);
+
+  // จัดเลขที่ใหม่สำหรับห้องที่โดนลบสมาชิกออกไป เพื่อไม่ให้เลขที่แหว่งในอนาคต
+  if (target && target.classroom) {
+    const classroom = target.classroom;
+    const classStudents = nextStudents.filter((s: Student) => s.classroom === classroom);
+    const otherStudents = nextStudents.filter((s: Student) => s.classroom !== classroom);
+
+    // เรียงตามเลขที่เดิม
+    classStudents.sort((a: any, b: any) => {
+      const numA = parseInt(a.number, 10) || 999;
+      const numB = parseInt(b.number, 10) || 999;
+      return numA - numB;
+    });
+
+    // รันเลขที่ใหม่ 1, 2, 3...
+    const updatedClassStudents = classStudents.map((s: any, idx: number) => ({
+      ...s,
+      number: String(idx + 1)
+    }));
+
+    nextStudents = [...otherStudents, ...updatedClassStudents];
+  }
+
+  let updatedLogs = logs;
+  if (actor && target) {
+    const roleLabel = getRoleLabel(actor.role);
+      
+    const newLog: ActivityLog = {
+      id: 'log_' + Date.now(),
+      timestamp: new Date().toISOString(),
+      actorId: actor.id,
+      actorName: actor.fullname,
+      actorRole: roleLabel,
+      action: `ลบสมาชิกจากทะเบียนสี (รหัส: ${target.id}, ชั้น: ${target.classroom || '-'}, เลขที่: ${target.number || '-'})`,
+      targetName: target.fullname
     };
     updatedLogs = [newLog, ...logs].slice(0, 200);
   }
@@ -294,18 +852,35 @@ export function updateStudent(studentId: string, updates: Partial<Student>, acto
 }
 
 export function updateMultipleStudents(studentIds: string[], updates: Partial<Student>, actor?: Student, logAction?: string) {
+  if (actor?.role === 'moderator') return;
   const { students, sports, announcements, logs } = getStoredData();
   const targetNames: string[] = [];
   
   const nextStudents = students.map((s: Student) => {
     if (studentIds.includes(s.id)) {
       targetNames.push(s.fullname);
-      const next = { ...s, ...updates };
-      if (updates.duty_status === 'none' || (updates.assigned_duty === 'none')) {
-        next.assigned_duty = 'none';
-        next.duty_status = 'none';
-        delete next.seat;
+      let next = { ...s, ...updates };
+      
+      if (updates.duties) {
+        next.duties = { ...(s.duties || {}), ...updates.duties };
+        Object.keys(next.duties).forEach(k => {
+          if (next.duties![k] === 'none') {
+            delete next.duties![k];
+          }
+        });
       }
+      
+      if (updates.assigned_duty !== undefined || updates.duty_status !== undefined) {
+        const d = updates.assigned_duty !== undefined ? updates.assigned_duty : s.assigned_duty;
+        const ds = updates.duty_status !== undefined ? updates.duty_status : s.duty_status;
+        if (d === 'none' || ds === 'none') {
+          next.duties = {};
+        } else {
+          next.duties = { ...(s.duties || {}), [d]: ds };
+        }
+      }
+      
+      next = syncLegacyDutyFields(next);
       return next;
     }
     return s;
@@ -313,9 +888,7 @@ export function updateMultipleStudents(studentIds: string[], updates: Partial<St
 
   let updatedLogs = logs;
   if (actor && logAction) {
-    const roleLabel =
-      actor.role === 'admin_president' ? 'ประธานสี' :
-      actor.role === 'staff_m5' ? 'พี่ ม.5 (สตาฟ)' : 'น้อง';
+    const roleLabel = getRoleLabel(actor.role);
     const targetsStr = targetNames.length > 3 
       ? `${targetNames.slice(0, 3).join(', ')} และคนอื่นๆ รวม ${targetNames.length} คน` 
       : targetNames.join(', ');
@@ -338,38 +911,104 @@ export function updateMultipleStudents(studentIds: string[], updates: Partial<St
 // ----------------------------------------------------------
 // Seat helpers
 // ----------------------------------------------------------
-export function bookSeat(studentId: string, seatLabel: string) {
+export function bookSeat(studentId: string, seatLabel: string, actor?: Student) {
   const { students, sports, announcements, logs } = getStoredData();
   
   // Clean old seat of this student
   let nextStudents = students.map((s: Student) => {
     if (s.seat === seatLabel) {
-      return { ...s, seat: undefined, assigned_duty: 'none', duty_status: 'none' as const };
+      return { 
+        ...s, 
+        seat: undefined, 
+        assigned_duty: 'stand' as const, 
+        duty_status: 'approved' as const,
+        duties: { ...(s.duties || {}), stand: 'approved' as const }
+      };
     }
     return s;
   });
+
+  const targetStudent = students.find((s: Student) => s.id === studentId);
 
   // Assign new seat
   nextStudents = nextStudents.map((s: Student) => {
     if (s.id === studentId) {
-      return { ...s, seat: seatLabel, assigned_duty: 'stand' as const, duty_status: 'approved' as const };
+      return { 
+        ...s, 
+        seat: seatLabel, 
+        assigned_duty: 'stand' as const, 
+        duty_status: 'approved' as const,
+        duties: { ...(s.duties || {}), stand: 'approved' as const }
+      };
     }
     return s;
   });
 
-  saveAll(nextStudents, sports, announcements, logs);
+  let updatedLogs = logs;
+  if (actor && targetStudent) {
+    const roleLabel = getRoleLabel(actor.role);
+      
+    const isSelf = actor.id === studentId;
+    const actionText = isSelf 
+      ? `จองที่นั่งสแตนเชียร์ รหัส ${seatLabel}` 
+      : `จัดสรรที่นั่งสแตนเชียร์ รหัส ${seatLabel}`;
+      
+    const newLog: ActivityLog = {
+      id: 'log_' + Date.now(),
+      timestamp: new Date().toISOString(),
+      actorId: actor.id,
+      actorName: actor.fullname,
+      actorRole: roleLabel,
+      action: actionText,
+      targetName: targetStudent.fullname
+    };
+    updatedLogs = [newLog, ...logs].slice(0, 200);
+  }
+
+  saveAll(nextStudents, sports, announcements, updatedLogs);
 }
 
-export function releaseSeat(seatLabel: string) {
+export function releaseSeat(seatLabel: string, actor?: Student) {
   const { students, sports, announcements, logs } = getStoredData();
+  const owner = students.find((s: Student) => s.seat === seatLabel);
+  
   const nextStudents = students.map((s: Student) => {
     if (s.seat === seatLabel) {
-      return { ...s, seat: undefined, assigned_duty: 'none' as const, duty_status: 'none' as const };
+      return { 
+        ...s, 
+        seat: undefined, 
+        assigned_duty: 'stand' as const, 
+        duty_status: 'approved' as const,
+        duties: { ...(s.duties || {}), stand: 'approved' as const }
+      };
     }
     return s;
   });
-  saveAll(nextStudents, sports, announcements, logs);
+
+  let updatedLogs = logs;
+  if (actor && owner) {
+    const roleLabel = getRoleLabel(actor.role);
+      
+    const isSelf = actor.id === owner.id;
+    const actionText = isSelf 
+      ? `ยกเลิกการจองที่นั่งสแตนเชียร์ รหัส ${seatLabel}` 
+      : `ปลดสมาชิกออกจากที่นั่งสแตนเชียร์ รหัส ${seatLabel}`;
+      
+    const newLog: ActivityLog = {
+      id: 'log_' + Date.now(),
+      timestamp: new Date().toISOString(),
+      actorId: actor.id,
+      actorName: actor.fullname,
+      actorRole: roleLabel,
+      action: actionText,
+      targetName: owner.fullname
+    };
+    updatedLogs = [newLog, ...logs].slice(0, 200);
+  }
+
+  saveAll(nextStudents, sports, announcements, updatedLogs);
 }
+
 
 // ----------------------------------------------------------
 // Sports event helpers
@@ -384,7 +1023,7 @@ export function addSportsEvent(name: string, category: string, actor?: Student) 
   };
   let updatedLogs = logs;
   if (actor) {
-    const roleLabel = actor.role === 'admin_president' ? 'ประธานสี' : 'พี่ ม.5 (สตาฟ)';
+    const roleLabel = getRoleLabel(actor.role);
     updatedLogs = [{
       id: 'log_' + Date.now(),
       timestamp: new Date().toISOString(),
@@ -411,7 +1050,7 @@ export function assignAthleteToEvent(eventId: string, studentId: string, actor?:
   if (actor) {
     const event = sports.find((e: SportsEvent) => e.id === eventId);
     const student = students.find((s: Student) => s.id === studentId);
-    const roleLabel = actor.role === 'admin_president' ? 'ประธานสี' : 'พี่ ม.5 (สตาฟ)';
+    const roleLabel = getRoleLabel(actor.role);
     updatedLogs = [{
       id: 'log_' + Date.now(),
       timestamp: new Date().toISOString(),
@@ -437,7 +1076,7 @@ export function removeAthleteFromEvent(eventId: string, studentId: string, actor
   if (actor) {
     const event = sports.find((e: SportsEvent) => e.id === eventId);
     const student = students.find((s: Student) => s.id === studentId);
-    const roleLabel = actor.role === 'admin_president' ? 'ประธานสี' : 'พี่ ม.5 (สตาฟ)';
+    const roleLabel = getRoleLabel(actor.role);
     updatedLogs = [{
       id: 'log_' + Date.now(),
       timestamp: new Date().toISOString(),
@@ -457,7 +1096,7 @@ export function removeSportsEvent(eventId: string, actor?: Student) {
   const nextSports = sports.filter((s: SportsEvent) => s.id !== eventId);
   let updatedLogs = logs;
   if (actor && event) {
-    const roleLabel = actor.role === 'admin_president' ? 'ประธานสี' : 'พี่ ม.5 (สตาฟ)';
+    const roleLabel = getRoleLabel(actor.role);
     updatedLogs = [{
       id: 'log_' + Date.now(),
       timestamp: new Date().toISOString(),
@@ -481,4 +1120,69 @@ export function saveStoredData(students: Student[], sports: SportsEvent[], annou
   }
   localStorage.setItem('pink69_logs', JSON.stringify(logs));
   notify();
+}
+
+export function saveSystemReports(reports: SystemReport[]) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('pink69_reports', JSON.stringify(reports));
+  notify();
+}
+
+export function importStudentsData(newStudents: Student[], mode: 'merge' | 'replace', actor?: Student) {
+  if (typeof window === 'undefined') return;
+  const { students: oldStudents, sports, announcements, logs, controllers } = getStoredData();
+  
+  let finalStudents: Student[] = [];
+  if (mode === 'replace') {
+    // Keep all existing controllers so they don't get logged out or deleted
+    const activeControllers = oldStudents.filter((s: Student) => controllers.includes(s.id));
+    // Filter out new student items that duplicate the controller IDs
+    const newStudentsFiltered = newStudents.filter((ns: Student) => !activeControllers.some((ac: Student) => ac.id === ns.id));
+    finalStudents = [...activeControllers, ...newStudentsFiltered];
+  } else {
+    // โหมด Merge (อัปเดตข้อมูลเดิม / เพิ่มตัวใหม่)
+    const studentMap = new Map<string, Student>();
+    oldStudents.forEach((s: Student) => studentMap.set(s.id, s));
+    newStudents.forEach((s: Student) => {
+      const existing = studentMap.get(s.id);
+      if (existing) {
+        // อัปเดตข้อมูลแต่รักษาฟิลด์สำคัญเช่น seat หรือ duties เดิมหากตัวใหม่ไม่ได้เจาะจง
+        const updatedDuties = { ...(existing.duties || {}), ...(s.duties || {}) };
+        studentMap.set(s.id, { 
+          ...existing, 
+          ...s,
+          duties: Object.keys(updatedDuties).length > 0 ? updatedDuties : existing.duties
+        });
+      } else {
+        studentMap.set(s.id, s);
+      }
+    });
+    finalStudents = Array.from(studentMap.values());
+  }
+
+  // สร้าง Log ประวัติการทำงาน
+  let actionText = '';
+  let targetNameText: string | undefined = undefined;
+  if (newStudents.length === 1) {
+    const targetStudent = newStudents[0];
+    actionText = `เพิ่มสมาชิกใหม่เข้าระบบ (รหัส: ${targetStudent.id}, ชั้น: ${targetStudent.classroom || '-'}, เลขที่: ${targetStudent.number || '-'})`;
+    targetNameText = targetStudent.fullname;
+  } else {
+    actionText = `นำเข้าข้อมูลรายชื่อสมาชิกจำนวน ${newStudents.length} คน (โหมด: ${mode === 'merge' ? 'ผสานข้อมูล' : 'แทนที่ทั้งหมด'})`;
+  }
+
+  const roleLabel = actor ? getRoleLabel(actor.role) : 'System';
+
+  const newLog: ActivityLog = {
+    id: 'log_' + Date.now(),
+    timestamp: new Date().toISOString(),
+    actorId: actor?.id || 'system',
+    actorName: actor?.fullname || 'System',
+    actorRole: roleLabel,
+    action: actionText,
+    targetName: targetNameText
+  };
+
+  const updatedLogs = [newLog, ...logs].slice(0, 200);
+  saveAll(finalStudents, sports, announcements, updatedLogs);
 }

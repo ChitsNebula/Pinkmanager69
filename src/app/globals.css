@@ -1,21 +1,47 @@
 @import "tailwindcss";
 
-@theme {
-  --color-pink-primary: #FF2E93;
-  --color-pink-accent: #FF70B8;
-  --color-pink-light: #FFF0F6;
-  --color-pink-glow: rgba(236, 72, 153, 0.3);
-  --color-carbon-dark: #0f1016;
-  --color-carbon-card: #1a1c29;
-  --color-carbon-light: #2a2e45;
-  --color-text-primary: #f8fafc;
-  --color-text-secondary: #94a3b8;
-  --color-text-tertiary: #64748b;
-}
-
 :root {
   --background: #0f1016;
   --foreground: #f8fafc;
+  --carbon-dark: #0f1016;
+  --carbon-card: #1a1c29;
+  --carbon-light: #2a2e45;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+  --pink-primary: #FF2E93;
+  --pink-accent: #FF70B8;
+  --pink-light: #FFF0F6;
+  --pink-glow: rgba(236, 72, 153, 0.3);
+}
+
+.theme-light {
+  --background: #f8fafc;
+  --foreground: #0f1016;
+  --carbon-dark: #f1f5f9;
+  --carbon-card: #ffffff;
+  --carbon-light: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #64748b;
+  --pink-primary: #db2777;
+  --pink-accent: #ec4899;
+  --pink-light: #fdf2f8;
+  --pink-glow: rgba(219, 39, 119, 0.15);
+}
+
+@theme {
+  --color-pink-primary: var(--pink-primary);
+  --color-pink-accent: var(--pink-accent);
+  --color-pink-light: var(--pink-light);
+  --color-pink-glow: var(--pink-glow);
+  --color-carbon-dark: var(--carbon-dark);
+  --color-carbon-card: var(--carbon-card);
+  --color-carbon-light: var(--carbon-light);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-white: #ffffff;
 }
 
 body {
@@ -24,6 +50,11 @@ body {
   font-family: var(--font-sarabun), var(--font-outfit), sans-serif;
   overflow-x: hidden;
   background-image: radial-gradient(circle at 50% -20%, rgba(236, 72, 153, 0.12) 0%, rgba(15, 16, 22, 0) 60%);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.theme-light body {
+  background-image: radial-gradient(circle at 50% -20%, rgba(219, 39, 119, 0.08) 0%, rgba(248, 250, 252, 0) 60%);
 }
 
 .font-thai {
@@ -31,17 +62,35 @@ body {
 }
 
 /* Glassmorphism utility inspired by the User's Finance App structure */
+:root {
+  --glass-bg: rgba(26, 28, 41, 0.85);
+  --glass-nav-bg: rgba(26, 28, 41, 0.8);
+  --glass-border: rgba(236, 72, 153, 0.08);
+  --glass-nav-border: rgba(236, 72, 153, 0.12);
+  --scroll-track: #0f1016;
+  --scroll-thumb: #2a2e45;
+}
+
+.theme-light {
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-nav-bg: rgba(248, 250, 252, 0.85);
+  --glass-border: rgba(219, 39, 119, 0.12);
+  --glass-nav-border: rgba(219, 39, 119, 0.18);
+  --scroll-track: #f1f5f9;
+  --scroll-thumb: #cbd5e1;
+}
+
 .glass-panel {
-  background: rgba(26, 28, 41, 0.85);
+  background: var(--glass-bg);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(236, 72, 153, 0.08);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.4);
 }
 
 .glass-nav {
-  background: rgba(26, 28, 41, 0.8);
+  background: var(--glass-nav-bg);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(236, 72, 153, 0.12);
+  border-bottom: 1px solid var(--glass-nav-border);
 }
 
 /* Custom Scrollbar */
@@ -50,12 +99,47 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f1016;
+  background: var(--scroll-track);
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a2e45;
+  background: var(--scroll-thumb);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #FF2E93;
+  background: var(--pink-primary);
+}
+
+/* --- Light Theme Text Colors Overrides --- */
+.theme-light .text-white {
+  color: var(--text-primary) !important;
+}
+
+/* คืนค่าสีขาวสำหรับปุ่มหรือการ์ดที่มีพื้นหลังสีเข้ม */
+.theme-light .bg-pink-primary .text-white,
+.theme-light .bg-pink-primary.text-white,
+.theme-light .bg-pink-accent .text-white,
+.theme-light .bg-pink-accent.text-white,
+.theme-light .bg-yellow-500 .text-white,
+.theme-light .bg-yellow-500.text-white,
+.theme-light .bg-blue-600 .text-white,
+.theme-light .bg-blue-600.text-white,
+.theme-light .bg-green-600 .text-white,
+.theme-light .bg-green-600.text-white,
+.theme-light .bg-red-600 .text-white,
+.theme-light .bg-red-600.text-white,
+.theme-light .bg-red-500 .text-white,
+.theme-light .bg-red-500.text-white,
+.theme-light .bg-emerald-600 .text-white,
+.theme-light .bg-emerald-600.text-white,
+.theme-light .bg-rose-600 .text-white,
+.theme-light .bg-rose-600.text-white,
+.theme-light button.bg-pink-primary,
+.theme-light button.bg-pink-accent,
+.theme-light button.bg-red-500 {
+  color: #ffffff !important;
+}
+
+/* Hover:text-white ใน Light Mode ให้เปลี่ยนเป็นสีชมพูแทน เพื่อให้อ่านออกเมื่อชี้ */
+.theme-light .hover\:text-white:hover {
+  color: var(--pink-primary) !important;
 }

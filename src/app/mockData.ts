@@ -10,8 +10,10 @@ export interface Student {
   role: Role;
   assigned_duty: Duty;
   duty_status: DutyStatus;
+  duties?: { [key: string]: DutyStatus };
   seat?: string; // e.g. A1, B17
   rejection_reason?: string; // เหตุผลที่ถูกปฏิเสธหน้าที่
+  avatar?: string; // รูปถ่าย/รูปประจำตัวนักกีฬา (base64 string)
 }
 
 export interface SportsEvent {
@@ -1427,10 +1429,19 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
+    "id": "41750",
+    "fullname": "นนท์นภัส อภัยกาวี",
+    "classroom": "ม.2/14",
+    "number": "7",
+    "role": "student_m13",
+    "assigned_duty": "none",
+    "duty_status": "none"
+  },
+  {
     "id": "41860",
     "fullname": "กมลพรรณ สุขกมลกุล (คุนคุน)",
     "classroom": "ม.2/14",
-    "number": "7",
+    "number": "8",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1439,7 +1450,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "41862",
     "fullname": "กรกมล แก้วสีทอง (ใบบัว)",
     "classroom": "ม.2/14",
-    "number": "8",
+    "number": "9",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1448,7 +1459,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "41871",
     "fullname": "กัญญพัชร รัตนชมภู (กวาง)",
     "classroom": "ม.2/14",
-    "number": "9",
+    "number": "10",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1457,7 +1468,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "41881",
     "fullname": "กันยกร เรือนสังข์ (กัน)",
     "classroom": "ม.2/14",
-    "number": "10",
+    "number": "11",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1466,7 +1477,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "41907",
     "fullname": "จิรภิญญา เชิดอยู่ (วุ้นเส้น)",
     "classroom": "ม.2/14",
-    "number": "11",
+    "number": "12",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1475,7 +1486,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "41914",
     "fullname": "ชญานิศ ชุมภูอินทร์ (ไอเดีย)",
     "classroom": "ม.2/14",
-    "number": "12",
+    "number": "13",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1484,7 +1495,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "41918",
     "fullname": "ชนิกานต์ แก้ววิเศษ (ตอมแตมป์)",
     "classroom": "ม.2/14",
-    "number": "13",
+    "number": "14",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1493,7 +1504,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "41934",
     "fullname": "ณมชล คังคา (ทับทิม)",
     "classroom": "ม.2/14",
-    "number": "14",
+    "number": "15",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1502,7 +1513,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "41938",
     "fullname": "ฐิติภัทรา วังกาวรรณ (ข้าวฟ่าง)",
     "classroom": "ม.2/14",
-    "number": "15",
+    "number": "16",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1511,7 +1522,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "41945",
     "fullname": "ณภัทรสรา วัชรนันทกร (นท)",
     "classroom": "ม.2/14",
-    "number": "16",
+    "number": "17",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1520,7 +1531,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "41948",
     "fullname": "ณรรฐ์ทิวา วิชาชาติ (ต้นข้าว)",
     "classroom": "ม.2/14",
-    "number": "17",
+    "number": "18",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1529,7 +1540,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "41955",
     "fullname": "ณัฏฐณิชา ชุมภูอินทร์ (ฟาง)",
     "classroom": "ม.2/14",
-    "number": "18",
+    "number": "19",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1538,7 +1549,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "41959",
     "fullname": "ณัฏฐจิตรา ดวงวิโรจน์ (ปริ้น)",
     "classroom": "ม.2/14",
-    "number": "19",
+    "number": "20",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1547,7 +1558,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "41964",
     "fullname": "ณัฐชา ชัดศรี (มะนาว)",
     "classroom": "ม.2/14",
-    "number": "20",
+    "number": "21",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1556,7 +1567,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "41987",
     "fullname": "ณิชชาภัทร สายยืด (เปียโน)",
     "classroom": "ม.2/14",
-    "number": "21",
+    "number": "22",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1565,7 +1576,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "41994",
     "fullname": "ณิญาดา เมืองมูล (ไอด้า)",
     "classroom": "ม.2/14",
-    "number": "22",
+    "number": "23",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1574,7 +1585,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42024",
     "fullname": "ธัญลักษณ์ อุปการ (เอบี)",
     "classroom": "ม.2/14",
-    "number": "23",
+    "number": "24",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1583,7 +1594,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42033",
     "fullname": "นรีกานต์ วิโรจน์เรืองรัตน์ (ใบหม่อน)",
     "classroom": "ม.2/14",
-    "number": "24",
+    "number": "25",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1592,7 +1603,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42039",
     "fullname": "นารดา เตปินตา (อิมอิม)",
     "classroom": "ม.2/14",
-    "number": "25",
+    "number": "26",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1601,7 +1612,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42045",
     "fullname": "เบญจมาศ ทับขำ (มิก)",
     "classroom": "ม.2/14",
-    "number": "26",
+    "number": "27",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1610,7 +1621,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42053",
     "fullname": "ปราณปรียา ปิ่นทอง (เพียงออ)",
     "classroom": "ม.2/14",
-    "number": "27",
+    "number": "28",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1619,7 +1630,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42063",
     "fullname": "ปิยฉัตร เพิ่มผล (หนูจี๊ด)",
     "classroom": "ม.2/14",
-    "number": "28",
+    "number": "29",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1628,7 +1639,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42070",
     "fullname": "ปัญรวิภา ทองแก้ว (ขวัญข้าว)",
     "classroom": "ม.2/14",
-    "number": "29",
+    "number": "30",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1637,7 +1648,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42095",
     "fullname": "พิชญา วงค์ฉายา (อุ๋งอิ๋ง)",
     "classroom": "ม.2/14",
-    "number": "30",
+    "number": "31",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1646,7 +1657,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42107",
     "fullname": "พิมพ์มาดา จิตไพศาล (กีต้าร์)",
     "classroom": "ม.2/14",
-    "number": "31",
+    "number": "32",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1655,7 +1666,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42110",
     "fullname": "พิมพ์วิมล ศรีวงษา (มาหยา)",
     "classroom": "ม.2/14",
-    "number": "32",
+    "number": "33",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1664,7 +1675,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42124",
     "fullname": "ภูริชญา กาศเจริญ (ไบร์ท)",
     "classroom": "ม.2/14",
-    "number": "33",
+    "number": "34",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1673,7 +1684,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42131",
     "fullname": "ยลรดี กาศสนุก (กล้วยหอม)",
     "classroom": "ม.2/14",
-    "number": "34",
+    "number": "35",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1682,7 +1693,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42177",
     "fullname": "ศิริกัญญา แก้วเอี่ยม (กิ้ฟ)",
     "classroom": "ม.2/14",
-    "number": "35",
+    "number": "36",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1691,7 +1702,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42191",
     "fullname": "สาธิดา ชุมภูหมุด (จุ๊บจิ้บ)",
     "classroom": "ม.2/14",
-    "number": "36",
+    "number": "37",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1700,7 +1711,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42204",
     "fullname": "สุพรรษา เรือนแสน (แก้มใส)",
     "classroom": "ม.2/14",
-    "number": "37",
+    "number": "38",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1709,7 +1720,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42209",
     "fullname": "สุรัสวดี สาระวะ (นาโน)",
     "classroom": "ม.2/14",
-    "number": "38",
+    "number": "39",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1718,7 +1729,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42227",
     "fullname": "อุรสยา คำมา (ตังตัง)",
     "classroom": "ม.2/14",
-    "number": "39",
+    "number": "40",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -1727,7 +1738,7 @@ export const INITIAL_STUDENTS: Student[] = [
     "id": "42928",
     "fullname": "ชนรัตน์ ช้องกา (ไข่ขวัญ)",
     "classroom": "ม.2/14",
-    "number": "40",
+    "number": "41",
     "role": "student_m13",
     "assigned_duty": "none",
     "duty_status": "none"
@@ -2102,8 +2113,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41278",
-    "fullname": "ธนารักษ์ กันยะวงศ์ (แน็กซ์-ลาออก-)",
+    "id": "41296",
+    "fullname": "ธีรวัฒน์ โสภณปิยวัฒน์ (แน็กซ์)",
     "classroom": "ม.3/13",
     "number": "4",
     "role": "student_m13",
@@ -2111,8 +2122,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41296",
-    "fullname": "ธีรวัฒน์ โสภณปิยะวัฒน์ (เนต)",
+    "id": "41320",
+    "fullname": "นันทวัฒน์ สุกแก้ว (เนต)",
     "classroom": "ม.3/13",
     "number": "5",
     "role": "student_m13",
@@ -2120,8 +2131,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41320",
-    "fullname": "นันทวัฒน์ สุกแก้ว (ปลื้ม)",
+    "id": "41399",
+    "fullname": "พัทธนันท์ วารีกุล (ปลื้ม)",
     "classroom": "ม.3/13",
     "number": "6",
     "role": "student_m13",
@@ -2129,8 +2140,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41399",
-    "fullname": "พัทธนันท์ วารีกุล (ปังปอนด์)",
+    "id": "41438",
+    "fullname": "พีรวิชญ์ เสนาธรรม (ปังปอนด์)",
     "classroom": "ม.3/13",
     "number": "7",
     "role": "student_m13",
@@ -2138,8 +2149,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41438",
-    "fullname": "พีรวิชญ์ เสนาธรรม (โมเดล)",
+    "id": "41467",
+    "fullname": "ภูตะวัน ธงสิบเจ็ด (โมเดล)",
     "classroom": "ม.3/13",
     "number": "8",
     "role": "student_m13",
@@ -2147,8 +2158,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41467",
-    "fullname": "ภูตะวัน ธงสิบเจ็ด (ปีโป้)",
+    "id": "41490",
+    "fullname": "รังศิพัฒน์ ตาอินทร (ปีโป้)",
     "classroom": "ม.3/13",
     "number": "9",
     "role": "student_m13",
@@ -2156,8 +2167,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41490",
-    "fullname": "รัชศิพัฒน์ ตาอินทร (ยิม)",
+    "id": "41518",
+    "fullname": "วุฒิชัย จันทร์คำ (ยิม)",
     "classroom": "ม.3/13",
     "number": "10",
     "role": "student_m13",
@@ -2165,8 +2176,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41518",
-    "fullname": "วุฒิชัย จันทร์คำ (ปลื้ม)",
+    "id": "41519",
+    "fullname": "ศรวัส คชสาร (ปลื้ม)",
     "classroom": "ม.3/13",
     "number": "11",
     "role": "student_m13",
@@ -2174,8 +2185,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41519",
-    "fullname": "ศรวัส คชสาร (ปาล์ม)",
+    "id": "41539",
+    "fullname": "ศุภสัณฑ์ สุขผ่อง (ปาล์ม)",
     "classroom": "ม.3/13",
     "number": "12",
     "role": "student_m13",
@@ -2183,8 +2194,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41539",
-    "fullname": "ศุภสัณห์ สุขผ่อง (มอส)",
+    "id": "41550",
+    "fullname": "สิทธินนท์ บกบี้ (มอส)",
     "classroom": "ม.3/13",
     "number": "13",
     "role": "student_m13",
@@ -2192,8 +2203,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41550",
-    "fullname": "สิทธินนต์ บกบี้ (พักตร์)",
+    "id": "42929",
+    "fullname": "พศวัต จะรอนรัมย์ (พักตร์)",
     "classroom": "ม.3/13",
     "number": "14",
     "role": "student_m13",
@@ -2201,8 +2212,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "42929",
-    "fullname": "พศวัต จะรอบรัมย์ (แพรวา)",
+    "id": "41072",
+    "fullname": "กนกมล เจริญศิริ (แพรวา)",
     "classroom": "ม.3/13",
     "number": "15",
     "role": "student_m13",
@@ -2210,8 +2221,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41072",
-    "fullname": "กชกมล เจริญศิริ (ปรายดาว)",
+    "id": "41077",
+    "fullname": "กนกวรรณ ศรีโพธา (ปรายดาว)",
     "classroom": "ม.3/13",
     "number": "16",
     "role": "student_m13",
@@ -2219,8 +2230,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41073",
-    "fullname": "กชพรรณ ศรีติสาร (มันปู-ลาออก-)",
+    "id": "41098",
+    "fullname": "ณทิรา อู่เงิน (มันปู)",
     "classroom": "ม.3/13",
     "number": "17",
     "role": "student_m13",
@@ -2228,8 +2239,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41077",
-    "fullname": "กนกวรรณ ศรีโพธา (ส้มโอ)",
+    "id": "41103",
+    "fullname": "กัญญภัค เจริญจิต (ส้มโอ)",
     "classroom": "ม.3/13",
     "number": "18",
     "role": "student_m13",
@@ -2237,8 +2248,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41098",
-    "fullname": "กษิรา อู่เงิน (อิงอิง)",
+    "id": "41125",
+    "fullname": "กานต์ธิดา ธงหนึ่ง (อิงอิง)",
     "classroom": "ม.3/13",
     "number": "19",
     "role": "student_m13",
@@ -2246,8 +2257,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41103",
-    "fullname": "กัญญภัค เจริญจิต (ปาย)",
+    "id": "41187",
+    "fullname": "ญาณาธิป ยุทธแสน (ปาย)",
     "classroom": "ม.3/13",
     "number": "20",
     "role": "student_m13",
@@ -2255,8 +2266,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41125",
-    "fullname": "กานต์ธิดา ธงหนึ่ง (มายมิ้น)",
+    "id": "41227",
+    "fullname": "ณัฐชยา พูนทวีป (มายมิ้น)",
     "classroom": "ม.3/13",
     "number": "21",
     "role": "student_m13",
@@ -2264,8 +2275,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41187",
-    "fullname": "ญาณาธิป ยุทธแสน (อาย)",
+    "id": "41246",
+    "fullname": "ณิชาภัทร วรินทร์ (อาย)",
     "classroom": "ม.3/13",
     "number": "22",
     "role": "student_m13",
@@ -2273,8 +2284,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41227",
-    "fullname": "ณัฐชยา พูนทวีป (นิ้ง)",
+    "id": "41287",
+    "fullname": "ธัญพิชชา อินทรสัตยพงศ์ (นิ้ง)",
     "classroom": "ม.3/13",
     "number": "23",
     "role": "student_m13",
@@ -2282,8 +2293,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41246",
-    "fullname": "ณิชาภัทร วรินทร์ (มันนี่)",
+    "id": "41292",
+    "fullname": "ธิดาขวัญ จิตธบุญ (มันนี่)",
     "classroom": "ม.3/13",
     "number": "24",
     "role": "student_m13",
@@ -2291,8 +2302,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41287",
-    "fullname": "ธัญพิชชา อินทรสัตยพงศ์ (หยก)",
+    "id": "41304",
+    "fullname": "ณรมน อุยาณะ (หยก)",
     "classroom": "ม.3/13",
     "number": "25",
     "role": "student_m13",
@@ -2300,8 +2311,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41292",
-    "fullname": "ธิดาขวัญ จิตรบุญ (โฟกัส)",
+    "id": "41347",
+    "fullname": "ประภัสสิริ กันทาบุตร (โฟกัส)",
     "classroom": "ม.3/13",
     "number": "26",
     "role": "student_m13",
@@ -2309,8 +2320,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41304",
-    "fullname": "นรมน อุยาณะ (สายป่าน)",
+    "id": "41364",
+    "fullname": "ปิยธิดา ขันตา (สายป่าน)",
     "classroom": "ม.3/13",
     "number": "27",
     "role": "student_m13",
@@ -2318,8 +2329,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41347",
-    "fullname": "ประภัสสิริ กันทาบุตร (ออม)",
+    "id": "41381",
+    "fullname": "เปรมกมล ครองสุข (ออม)",
     "classroom": "ม.3/13",
     "number": "28",
     "role": "student_m13",
@@ -2327,8 +2338,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41364",
-    "fullname": "ปิยธิดา ขันตา (พลอยใส)",
+    "id": "41415",
+    "fullname": "พิชญาภัค สายาจักร (พลอยใส)",
     "classroom": "ม.3/13",
     "number": "29",
     "role": "student_m13",
@@ -2336,8 +2347,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41381",
-    "fullname": "เปรมกมล ครองสุข (น้ำอิง)",
+    "id": "41443",
+    "fullname": "แพรวา วีรธนศิลป์ (น้ำอิง)",
     "classroom": "ม.3/13",
     "number": "30",
     "role": "student_m13",
@@ -2345,8 +2356,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41415",
-    "fullname": "พิชญาภัค สายาจักร (ฟ้าใส)",
+    "id": "41445",
+    "fullname": "ฟ้าใส เกิดสุข (ฟ้าใส)",
     "classroom": "ม.3/13",
     "number": "31",
     "role": "student_m13",
@@ -2354,8 +2365,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41443",
-    "fullname": "แพรวา วีรธนศิลป์ (วิว)",
+    "id": "41487",
+    "fullname": "รมิตา เรือนพรม (วิว)",
     "classroom": "ม.3/13",
     "number": "32",
     "role": "student_m13",
@@ -2363,8 +2374,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41445",
-    "fullname": "ฟ้าใส เกิดสุข (จ๊ะจ๋า)",
+    "id": "41496",
+    "fullname": "ฤทัยชนก เรือนแสน (จ๊ะจ๋า)",
     "classroom": "ม.3/13",
     "number": "33",
     "role": "student_m13",
@@ -2372,8 +2383,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41487",
-    "fullname": "รมิตา เรือนพรม (แบม)",
+    "id": "41511",
+    "fullname": "วันวิสาสา ราชวัง (แบม)",
     "classroom": "ม.3/13",
     "number": "34",
     "role": "student_m13",
@@ -2381,8 +2392,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41496",
-    "fullname": "ฤทัยชนก เรือนแสน (ปริม)",
+    "id": "41522",
+    "fullname": "ศรุดา แก้วโมรา (ปริม)",
     "classroom": "ม.3/13",
     "number": "35",
     "role": "student_m13",
@@ -2390,8 +2401,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41511",
-    "fullname": "วันวิสา ราชวัง (อะตอม)",
+    "id": "41562",
+    "fullname": "สุภัสสร หวายลี (อะตอม)",
     "classroom": "ม.3/13",
     "number": "36",
     "role": "student_m13",
@@ -2399,8 +2410,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41522",
-    "fullname": "ศรุดา แก้วโมรา (นีร)",
+    "id": "41566",
+    "fullname": "สุริญาพัศ จันทะนะ (นีร)",
     "classroom": "ม.3/13",
     "number": "37",
     "role": "student_m13",
@@ -2408,8 +2419,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41562",
-    "fullname": "สุภัสศร หวายลี (ไอซ์)",
+    "id": "41579",
+    "fullname": "อภิชญา ชมเชย (ไอซ์)",
     "classroom": "ม.3/13",
     "number": "38",
     "role": "student_m13",
@@ -2417,8 +2428,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41566",
-    "fullname": "สุริญาพัศ จันทะนะ (แป้ง)",
+    "id": "42930",
+    "fullname": "ณวิษา วงศ์ค่า (แป้ง)",
     "classroom": "ม.3/13",
     "number": "39",
     "role": "student_m13",
@@ -2426,26 +2437,8 @@ export const INITIAL_STUDENTS: Student[] = [
     "duty_status": "none"
   },
   {
-    "id": "41579",
-    "fullname": "อภิชญา ชมเชย",
-    "classroom": "ม.3/13",
-    "number": "40",
-    "role": "student_m13",
-    "assigned_duty": "none",
-    "duty_status": "none"
-  },
-  {
-    "id": "42930",
-    "fullname": "วชิษา วงศ์คำ",
-    "classroom": "ม.3/13",
-    "number": "41",
-    "role": "student_m13",
-    "assigned_duty": "none",
-    "duty_status": "none"
-  },
-  {
     "id": "40514",
-    "fullname": "กฤตยชญ์ สุขภัทรสิริ",
+    "fullname": "กฤตยชญ์ สุขภัทรสิริ (ภูริ)",
     "classroom": "ม.4/1",
     "number": "1",
     "role": "student_m4",
@@ -2454,7 +2447,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40519",
-    "fullname": "กษิดิ์เดช สมรส",
+    "fullname": "กษิดิ์เดช สมรส (ฟีฟ่า)",
     "classroom": "ม.4/1",
     "number": "2",
     "role": "student_m4",
@@ -2463,7 +2456,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40609",
-    "fullname": "ไชยภพ ผึ่งผาย",
+    "fullname": "ไชยภพ ผึ่งผาย (โกเบ)",
     "classroom": "ม.4/1",
     "number": "3",
     "role": "student_m4",
@@ -2472,7 +2465,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40612",
-    "fullname": "ญาณวุฒิ เนตรจำนงค์",
+    "fullname": "ญาณวุฒิ เนตรจำนงค์ (อูชิ)",
     "classroom": "ม.4/1",
     "number": "4",
     "role": "student_m4",
@@ -2481,7 +2474,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40657",
-    "fullname": "ณัฐพงษ์ ศรีใจวงศ์",
+    "fullname": "ณัฐพงษ์ ศรีใจวงศ์ (มอส)",
     "classroom": "ม.4/1",
     "number": "5",
     "role": "student_m4",
@@ -2490,7 +2483,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40788",
-    "fullname": "ปัณณวิชญ์ หาญสมุทร",
+    "fullname": "ปัณณวิชญ์ หาญสมุทร (ปัน)",
     "classroom": "ม.4/1",
     "number": "6",
     "role": "student_m4",
@@ -2499,7 +2492,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40847",
-    "fullname": "ภคนันท์ นันทจักร์",
+    "fullname": "ภคนันท์ นันทจักร์ (ข้าวกล้อง)",
     "classroom": "ม.4/1",
     "number": "7",
     "role": "student_m4",
@@ -2508,7 +2501,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40929",
-    "fullname": "ศศิวัฒน์ พงษ์พัศภิญโญ",
+    "fullname": "ศศิวัฒน์ พงษ์พัศภิญโญ (ทรอย)",
     "classroom": "ม.4/1",
     "number": "8",
     "role": "student_m4",
@@ -2517,7 +2510,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "42879",
-    "fullname": "ธนโชติ ศรีบุญเรือง",
+    "fullname": "ธนโชติ ศรีบุญเรือง (คอม)",
     "classroom": "ม.4/1",
     "number": "9",
     "role": "student_m4",
@@ -2526,7 +2519,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "42899",
-    "fullname": "พลาธิป จันรุณ",
+    "fullname": "พลาธิป จันรุณ (ต้นก้า)",
     "classroom": "ม.4/1",
     "number": "10",
     "role": "student_m4",
@@ -2535,7 +2528,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40531",
-    "fullname": "กัณชารีย์ อุ่มบางตลาด",
+    "fullname": "กัณชารีย์ อุ่มบางตลาด (ธูปหอม)",
     "classroom": "ม.4/1",
     "number": "11",
     "role": "student_m4",
@@ -2544,7 +2537,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40563",
-    "fullname": "ขวัญหล้า สุดใจ",
+    "fullname": "ขวัญหล้า สุดใจ (นาง)",
     "classroom": "ม.4/1",
     "number": "12",
     "role": "student_m4",
@@ -2553,7 +2546,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40568",
-    "fullname": "จารุกัญญ์ นันตา",
+    "fullname": "จารุกัญญ์ นันตา (อองฟอง)",
     "classroom": "ม.4/1",
     "number": "13",
     "role": "student_m4",
@@ -2562,7 +2555,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40622",
-    "fullname": "ณชนิชา ไชยมงคล",
+    "fullname": "ณชนิชา ไชยมงคล (ดิ้วตี้)",
     "classroom": "ม.4/1",
     "number": "14",
     "role": "student_m4",
@@ -2571,7 +2564,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40627",
-    "fullname": "ณปภัสร ตั้งตรงจิตร",
+    "fullname": "ณปภัสร ตั้งตรงจิตร (ต้นหอม)",
     "classroom": "ม.4/1",
     "number": "15",
     "role": "student_m4",
@@ -2580,7 +2573,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40633",
-    "fullname": "ณัชชา ศรีสุระ",
+    "fullname": "ณัชชา ศรีสุระ (ใจเอย)",
     "classroom": "ม.4/1",
     "number": "16",
     "role": "student_m4",
@@ -2589,7 +2582,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40643",
-    "fullname": "ณัฏฐา เทพจันที",
+    "fullname": "ณัฏฐา เทพจันที (นาย)",
     "classroom": "ม.4/1",
     "number": "17",
     "role": "student_m4",
@@ -2598,7 +2591,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40651",
-    "fullname": "ณัฐณิชา ทองตัน",
+    "fullname": "ณัฐณิชา ทองตัน (กอข้าว)",
     "classroom": "ม.4/1",
     "number": "18",
     "role": "student_m4",
@@ -2607,7 +2600,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40686",
-    "fullname": "ทิพย์วรางค์ เสนาธรรม",
+    "fullname": "ทิพย์วรางค์ เสนาธรรม (ก้านพลู)",
     "classroom": "ม.4/1",
     "number": "19",
     "role": "student_m4",
@@ -2616,7 +2609,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40687",
-    "fullname": "ธนกร ปิ่นจงมีสุข",
+    "fullname": "ธนกร ปิ่นจงมีสุข (น้ำว้า)",
     "classroom": "ม.4/1",
     "number": "20",
     "role": "student_m4",
@@ -2625,7 +2618,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40757",
-    "fullname": "นิรภัฏ นาเวียง",
+    "fullname": "นิรภัฏ นาเวียง (โปรแกรม)",
     "classroom": "ม.4/1",
     "number": "21",
     "role": "student_m4",
@@ -2634,7 +2627,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40792",
-    "fullname": "ปานรดา ทิพย์ปัญญา",
+    "fullname": "ปานรดา ทิพย์ปัญญา (เปเป้)",
     "classroom": "ม.4/1",
     "number": "22",
     "role": "student_m4",
@@ -2643,7 +2636,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40804",
-    "fullname": "ปุณยวีร์ กันยามี",
+    "fullname": "ปุณยวีร์ กันยามี (อัณณ์)",
     "classroom": "ม.4/1",
     "number": "23",
     "role": "student_m4",
@@ -2652,7 +2645,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40830",
-    "fullname": "พิชญกานต์ อินกัน",
+    "fullname": "พิชญกานต์ อินกัน (เอิร์น)",
     "classroom": "ม.4/1",
     "number": "24",
     "role": "student_m4",
@@ -2661,7 +2654,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40864",
-    "fullname": "ภิญญาพัชญ์ เวียงทอง",
+    "fullname": "ภิญญาพัชญ์ เวียงทอง (แพนเค้ก)",
     "classroom": "ม.4/1",
     "number": "25",
     "role": "student_m4",
@@ -2670,7 +2663,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40902",
-    "fullname": "วรัชยา ร่องพืช",
+    "fullname": "วรัชยา ร่องพืช (น้ำขิง)",
     "classroom": "ม.4/1",
     "number": "26",
     "role": "student_m4",
@@ -2679,7 +2672,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40926",
-    "fullname": "ศรุตยา กิงโคง",
+    "fullname": "ศรุตยา กิงโคง (ข้าวหอม)",
     "classroom": "ม.4/1",
     "number": "27",
     "role": "student_m4",
@@ -2688,7 +2681,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "40928",
-    "fullname": "ศศิมินตรา สุวรรณกาศ",
+    "fullname": "ศศิมินตรา สุวรรณกาศ (ใบบัว)",
     "classroom": "ม.4/1",
     "number": "28",
     "role": "student_m4",
@@ -2697,7 +2690,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "42877",
-    "fullname": "ดารารัตน์ ยินดี",
+    "fullname": "ดารารัตน์ ยินดี (น้ำหวาน)",
     "classroom": "ม.4/1",
     "number": "29",
     "role": "student_m4",
@@ -2706,7 +2699,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     "id": "42901",
-    "fullname": "พิชญดา ผัดขัน",
+    "fullname": "พิชญดา ผัดขัน (ข้าวฟ่าง)",
     "classroom": "ม.4/1",
     "number": "30",
     "role": "student_m4",
@@ -4044,15 +4037,6 @@ export const INITIAL_STUDENTS: Student[] = [
     "role": "staff_m5",
     "assigned_duty": "none",
     "duty_status": "none"
-  },
-  {
-    "id": "admin",
-    "fullname": "ประธานสีชมพู (แอดมิน)",
-    "classroom": "ม.5/8",
-    "number": "99",
-    "role": "admin_president",
-    "assigned_duty": "staff",
-    "duty_status": "approved"
   }
 ];
 
