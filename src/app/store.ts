@@ -65,6 +65,37 @@ function notify() {
   LISTENERS.forEach(l => l());
 }
 
+function safeGetItem(key: string): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(key);
+  } catch (e) {
+    console.error(`[LocalStorage Error] safeGetItem failed for key "${key}":`, e);
+    return null;
+  }
+}
+
+function safeSetItem(key: string, value: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    console.error(`[LocalStorage Error] safeSetItem failed for key "${key}":`, e);
+  }
+}
+
+function safeJsonParse<T>(rawStr: string | null, defaultValue: T): T {
+  if (!rawStr) return defaultValue;
+  try {
+    return JSON.parse(rawStr) as T;
+  } catch (e) {
+    console.error(`[JSON Parse Error] failed parsing string:`, e);
+    return defaultValue;
+  }
+}
+
+
+
 export interface SpecialDuty {
   id: string;
   title: string;
@@ -173,60 +204,60 @@ export function getStoredData() {
       reports: DEFAULT_REPORTS
     };
   }
-  const studentsRaw = localStorage.getItem('pink69_students');
-  const sportsRaw = localStorage.getItem('pink69_sports');
-  const announcementsRaw = localStorage.getItem('pink69_announcements');
-  const logsRaw = localStorage.getItem('pink69_logs');
+  const studentsRaw = safeGetItem('pink69_students');
+  const sportsRaw = safeGetItem('pink69_sports');
+  const announcementsRaw = safeGetItem('pink69_announcements');
+  const logsRaw = safeGetItem('pink69_logs');
   
-  const controllersRaw = localStorage.getItem('pink69_controllers');
-  const moderatorsRaw = localStorage.getItem('pink69_moderators');
-  const standOpenRaw = localStorage.getItem('pink69_stand_open');
-  const standLockedRaw = localStorage.getItem('pink69_stand_locked');
-  const specialDutiesRaw = localStorage.getItem('pink69_special_duties');
-  const athleteQrRaw = localStorage.getItem('pink69_athlete_qr');
-  const processionQrRaw = localStorage.getItem('pink69_procession_qr');
-  const processionLimitRaw = localStorage.getItem('pink69_procession_limit');
-  const processionTitleRaw = localStorage.getItem('pink69_procession_title');
-  const songsRaw = localStorage.getItem('pink69_songs');
+  const controllersRaw = safeGetItem('pink69_controllers');
+  const moderatorsRaw = safeGetItem('pink69_moderators');
+  const standOpenRaw = safeGetItem('pink69_stand_open');
+  const standLockedRaw = safeGetItem('pink69_stand_locked');
+  const specialDutiesRaw = safeGetItem('pink69_special_duties');
+  const athleteQrRaw = safeGetItem('pink69_athlete_qr');
+  const processionQrRaw = safeGetItem('pink69_procession_qr');
+  const processionLimitRaw = safeGetItem('pink69_procession_limit');
+  const processionTitleRaw = safeGetItem('pink69_procession_title');
+  const songsRaw = safeGetItem('pink69_songs');
 
-  let rawStudents = studentsRaw ? JSON.parse(studentsRaw) : INITIAL_STUDENTS;
+  let rawStudents = safeJsonParse<Student[]>(studentsRaw, INITIAL_STUDENTS);
 
   // Auto-migration ม.3/13 v2
   if (typeof window !== 'undefined') {
-    const isMigrated = localStorage.getItem('pink69_m313_migrated_v2') === 'true';
+    const isMigrated = safeGetItem('pink69_m313_migrated_v2') === 'true';
     if (!isMigrated) {
-      const nonM313 = rawStudents.filter((s: any) => s.classroom !== 'ม.3/13');
-      const newM313 = INITIAL_STUDENTS.filter((s: any) => s.classroom === 'ม.3/13');
+      const nonM313 = rawStudents.filter((s: Student) => s.classroom !== 'ม.3/13');
+      const newM313 = INITIAL_STUDENTS.filter((s: Student) => s.classroom === 'ม.3/13');
       rawStudents = [...nonM313, ...newM313];
-      localStorage.setItem('pink69_students', JSON.stringify(rawStudents));
-      localStorage.setItem('pink69_m313_migrated_v2', 'true');
+      safeSetItem('pink69_students', JSON.stringify(rawStudents));
+      safeSetItem('pink69_m313_migrated_v2', 'true');
     }
   }
-  const sports = sportsRaw ? JSON.parse(sportsRaw) : INITIAL_SPORTS;
-  const announcements = announcementsRaw ? JSON.parse(announcementsRaw) : DEFAULT_ANNOUNCEMENTS;
-  const logs: ActivityLog[] = logsRaw ? JSON.parse(logsRaw) : DEFAULT_LOGS;
+  const sports = safeJsonParse<SportsEvent[]>(sportsRaw, INITIAL_SPORTS);
+  const announcements = safeJsonParse<Announcement[]>(announcementsRaw, DEFAULT_ANNOUNCEMENTS);
+  const logs = safeJsonParse<ActivityLog[]>(logsRaw, DEFAULT_LOGS);
 
   const defaultControllers = ['39967', '39998', '40059']; // Default controllers including farm (40059)
-  let controllers: string[] = controllersRaw ? JSON.parse(controllersRaw) : defaultControllers;
-  let moderators: string[] = moderatorsRaw ? JSON.parse(moderatorsRaw) : [];
+  let controllers = safeJsonParse<string[]>(controllersRaw, defaultControllers);
+  let moderators = safeJsonParse<string[]>(moderatorsRaw, []);
 
   // Auto-migration: Ensure default controllers are merged into user's localStorage
   if (typeof window !== 'undefined') {
-    const isControllersMigrated = localStorage.getItem('pink69_controllers_migrated_v2') === 'true';
+    const isControllersMigrated = safeGetItem('pink69_controllers_migrated_v2') === 'true';
     if (!isControllersMigrated) {
       const merged = Array.from(new Set([...controllers, ...defaultControllers]));
       controllers = merged;
-      localStorage.setItem('pink69_controllers', JSON.stringify(merged));
-      localStorage.setItem('pink69_controllers_migrated_v2', 'true');
+      safeSetItem('pink69_controllers', JSON.stringify(merged));
+      safeSetItem('pink69_controllers_migrated_v2', 'true');
     }
   }
 
   // Auto-migration: Ensure default controller student profiles are in the students list so they have identities
   if (typeof window !== 'undefined') {
-    const isStudentsControllersMigrated = localStorage.getItem('pink69_students_controllers_migrated_v3') === 'true';
+    const isStudentsControllersMigrated = safeGetItem('pink69_students_controllers_migrated_v3') === 'true';
     if (!isStudentsControllersMigrated) {
       let nextStudents = [...rawStudents];
-      const defaultControllerProfiles = [
+      const defaultControllerProfiles: Student[] = [
         {
           id: "39967",
           fullname: "กฤติธี แสนคำ (มิวสิค)",
@@ -249,7 +280,7 @@ export function getStoredData() {
 
       let hasAdded = false;
       defaultControllerProfiles.forEach(profile => {
-        if (!nextStudents.some((s: any) => s.id === profile.id)) {
+        if (!nextStudents.some((s: Student) => s.id === profile.id)) {
           nextStudents.push(profile);
           hasAdded = true;
         }
@@ -257,12 +288,12 @@ export function getStoredData() {
 
       if (hasAdded) {
         rawStudents = nextStudents;
-        localStorage.setItem('pink69_students', JSON.stringify(rawStudents));
+        safeSetItem('pink69_students', JSON.stringify(rawStudents));
       }
-      localStorage.setItem('pink69_students_controllers_migrated_v3', 'true');
+      safeSetItem('pink69_students_controllers_migrated_v3', 'true');
     }
 
-    const isNicknamesMigrated = localStorage.getItem('pink69_m41_nicknames_migrated_v1') === 'true';
+    const isNicknamesMigrated = safeGetItem('pink69_m41_nicknames_migrated_v1') === 'true';
     if (!isNicknamesMigrated) {
       const nicknamesM41: Record<string, string> = {
         "1": "ภูริ",
@@ -298,7 +329,7 @@ export function getStoredData() {
       };
       
       let modified = false;
-      rawStudents = rawStudents.map((s: any) => {
+      rawStudents = rawStudents.map((s: Student) => {
         if (s.classroom === 'ม.4/1' && nicknamesM41[s.number]) {
           const nick = nicknamesM41[s.number];
           if (!s.fullname.includes(`(${nick})`)) {
@@ -311,9 +342,9 @@ export function getStoredData() {
       });
       
       if (modified) {
-        localStorage.setItem('pink69_students', JSON.stringify(rawStudents));
+        safeSetItem('pink69_students', JSON.stringify(rawStudents));
       }
-      localStorage.setItem('pink69_m41_nicknames_migrated_v1', 'true');
+      safeSetItem('pink69_m41_nicknames_migrated_v1', 'true');
     }
   }
 
@@ -328,37 +359,37 @@ export function getStoredData() {
 
   // Auto-migration: แปลง segments.text เดิม → segments.words (v1)
   if (typeof window !== 'undefined') {
-    const isSongMigrated = localStorage.getItem('pink69_songs_words_v1') === 'true';
+    const isSongMigrated = safeGetItem('pink69_songs_words_v1') === 'true';
     if (!isSongMigrated) {
-      songs = songs.map((song: any) => ({
+      songs = songs.map((song: Song) => ({
         ...song,
-        segments: (song.segments || []).map((seg: any) => {
-          if (seg.words) return seg; // already migrated
+        segments: (song.segments || []).map((seg: { text?: string; words?: SongWord[]; id: string; visuals: Record<string, string> }) => {
+          if (seg.words) return seg as SongSegment; // already migrated
           return {
             ...seg,
             words: [{ text: seg.text || '', isTagged: false }],
-          };
+          } as SongSegment;
         }),
       }));
-      localStorage.setItem('pink69_songs', JSON.stringify(songs));
-      localStorage.setItem('pink69_songs_words_v1', 'true');
+      safeSetItem('pink69_songs', JSON.stringify(songs));
+      safeSetItem('pink69_songs_words_v1', 'true');
     }
   }
-  const reportsRaw = localStorage.getItem('pink69_reports');
-  const reports: SystemReport[] = reportsRaw ? JSON.parse(reportsRaw) : DEFAULT_REPORTS;
+  const reportsRaw = safeGetItem('pink69_reports');
+  const reports: SystemReport[] = safeJsonParse<SystemReport[]>(reportsRaw, DEFAULT_REPORTS);
 
   // Auto-migration: แทรก นนท์นภัส อภัยกาวี เข้าไปเป็น ม.2/14 เลขที่ 7 และขยับคนอื่น
   if (typeof window !== 'undefined') {
-    const isNonnaphatInserted = localStorage.getItem('pink69_m214_insert_nonnaphat_v3') === 'true';
+    const isNonnaphatInserted = safeGetItem('pink69_m214_insert_nonnaphat_v3') === 'true';
     if (!isNonnaphatInserted) {
       // ดึงรายชื่อคนอื่นที่ไม่ใช่ ม.2/14
-      const otherStudents = rawStudents.filter((s: any) => s.classroom !== 'ม.2/14');
+      const otherStudents = rawStudents.filter((s: Student) => s.classroom !== 'ม.2/14');
       
       // ดึง ม.2/14 ทั้งหมด (รวม 41750 ถ้ามี)
-      let m214 = rawStudents.filter((s: any) => s.classroom === 'ม.2/14');
+      let m214 = rawStudents.filter((s: Student) => s.classroom === 'ม.2/14');
       
       // ดึง นนท์นภัส (41750)
-      let nonnaphat = m214.find((s: any) => s.id === '41750');
+      let nonnaphat = m214.find((s: Student) => s.id === '41750');
       if (!nonnaphat) {
         nonnaphat = {
           id: "41750",
@@ -372,18 +403,18 @@ export function getStoredData() {
       }
 
       // กรองเอาคน ม.2/14 ที่ไม่ใช่นนท์นภัส
-      const restOfM214 = m214.filter((s: any) => s.id !== '41750');
+      const restOfM214 = m214.filter((s: Student) => s.id !== '41750');
 
       // เรียงคนอื่นตามเลขที่เดิม
-      restOfM214.sort((a: any, b: any) => {
+      restOfM214.sort((a: Student, b: Student) => {
         const numA = parseInt(a.number, 10) || 999;
         const numB = parseInt(b.number, 10) || 999;
         return numA - numB;
       });
 
       // จัดเรียงใหม่โดยแทรก นนท์นภัส ที่เลขที่ 7
-      const reorderedM214: any[] = [];
-      restOfM214.forEach((s: any, idx: number) => {
+      const reorderedM214: Student[] = [];
+      restOfM214.forEach((s: Student, idx: number) => {
         if (idx < 6) {
           reorderedM214.push({ ...s, number: String(idx + 1) });
         } else {
@@ -397,14 +428,14 @@ export function getStoredData() {
 
       // รวมกลับเข้าไป
       rawStudents = [...otherStudents, ...reorderedM214];
-      localStorage.setItem('pink69_students', JSON.stringify(rawStudents));
-      localStorage.setItem('pink69_m214_insert_nonnaphat_v3', 'true');
+      safeSetItem('pink69_students', JSON.stringify(rawStudents));
+      safeSetItem('pink69_m214_insert_nonnaphat_v3', 'true');
     }
   }
 
   // Auto-migration ขบวนพาเหรด v2 (ย้ายจากหน้าที่พิเศษของเดิม ไปเป็น procession)
   if (typeof window !== 'undefined') {
-    const isMigrated = localStorage.getItem('pink69_procession_migrated_v2') === 'true';
+    const isMigrated = safeGetItem('pink69_procession_migrated_v2') === 'true';
     if (!isMigrated) {
       const targetSpecial = specialDuties.find(sd => sd.title.includes('ขบวน'));
       if (targetSpecial) {
@@ -421,10 +452,10 @@ export function getStoredData() {
           return next;
         });
         specialDuties = specialDuties.filter(sd => sd.id !== targetId);
-        localStorage.setItem('pink69_students', JSON.stringify(rawStudents));
-        localStorage.setItem('pink69_special_duties', JSON.stringify(specialDuties));
+        safeSetItem('pink69_students', JSON.stringify(rawStudents));
+        safeSetItem('pink69_special_duties', JSON.stringify(specialDuties));
       }
-      localStorage.setItem('pink69_procession_migrated_v2', 'true');
+      safeSetItem('pink69_procession_migrated_v2', 'true');
     }
   }
 
@@ -433,7 +464,7 @@ export function getStoredData() {
     let hasIdCleaned = false;
     const seenIds = new Set<string>();
     
-    rawStudents = rawStudents.map((student: any) => {
+    rawStudents = rawStudents.map((student: Student) => {
       let currentId = student.id ? String(student.id).trim() : '';
       // เช็คว่า ID เป็นค่าว่าง หรือ "ยังไม่มี" หรือ "undefined" หรือซ้ำ
       if (!currentId || currentId === 'ยังไม่มี' || currentId === 'undefined' || seenIds.has(currentId)) {
@@ -441,7 +472,7 @@ export function getStoredData() {
         let newId = '';
         do {
           newId = String(Math.floor(10000 + Math.random() * 90000));
-        } while (seenIds.has(newId) || rawStudents.some((s: any) => s.id === newId));
+        } while (seenIds.has(newId) || rawStudents.some((s: Student) => s.id === newId));
         
         currentId = newId;
         hasIdCleaned = true;
@@ -451,7 +482,7 @@ export function getStoredData() {
     });
 
     if (hasIdCleaned) {
-      localStorage.setItem('pink69_students', JSON.stringify(rawStudents));
+      safeSetItem('pink69_students', JSON.stringify(rawStudents));
     }
   }
 
@@ -498,16 +529,16 @@ function saveAll(
   logs: ActivityLog[]
 ) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem('pink69_students', JSON.stringify(students));
-  localStorage.setItem('pink69_sports', JSON.stringify(sports));
-  localStorage.setItem('pink69_announcements', JSON.stringify(announcements));
-  localStorage.setItem('pink69_logs', JSON.stringify(logs));
+  safeSetItem('pink69_students', JSON.stringify(students));
+  safeSetItem('pink69_sports', JSON.stringify(sports));
+  safeSetItem('pink69_announcements', JSON.stringify(announcements));
+  safeSetItem('pink69_logs', JSON.stringify(logs));
   notify();
 }
 
 export function saveSongs(songs: Song[], actor?: Student, action?: string) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem('pink69_songs', JSON.stringify(songs));
+  safeSetItem('pink69_songs', JSON.stringify(songs));
   
   if (actor && action) {
     const { logs } = getStoredData();
@@ -522,7 +553,7 @@ export function saveSongs(songs: Song[], actor?: Student, action?: string) {
       action,
     };
     const updatedLogs = [newLog, ...logs].slice(0, 200);
-    localStorage.setItem('pink69_logs', JSON.stringify(updatedLogs));
+    safeSetItem('pink69_logs', JSON.stringify(updatedLogs));
   }
   notify();
 }
@@ -530,7 +561,7 @@ export function saveSongs(songs: Song[], actor?: Student, action?: string) {
 export function toggleSongLock(songId: string, actor?: Student): void {
   if (typeof window === 'undefined') return;
   if (actor?.role === 'moderator') return;
-  const songsRaw = localStorage.getItem('pink69_songs');
+  const songsRaw = safeGetItem('pink69_songs');
   if (!songsRaw) return;
   try {
     const songs: Song[] = JSON.parse(songsRaw);
@@ -549,13 +580,13 @@ export function toggleSongLock(songId: string, actor?: Student): void {
             action: nextLocked ? `ล็อคเพลง "${s.title}" เพื่อป้องกันการแก้ไข` : `ปลดล็อคเพลง "${s.title}" ให้สามารถแก้ไขได้`
           };
           const updatedLogs = [newLog, ...logs].slice(0, 200);
-          localStorage.setItem('pink69_logs', JSON.stringify(updatedLogs));
+          safeSetItem('pink69_logs', JSON.stringify(updatedLogs));
         }
         return { ...s, isLocked: nextLocked };
       }
       return s;
     });
-    localStorage.setItem('pink69_songs', JSON.stringify(updatedSongs));
+    safeSetItem('pink69_songs', JSON.stringify(updatedSongs));
     notify();
   } catch (e) {
     console.error('Failed to toggle song lock:', e);
@@ -576,31 +607,31 @@ export function saveSystemConfig(config: {
   if (typeof window === 'undefined') return;
   
   if (config.controllers !== undefined) {
-    localStorage.setItem('pink69_controllers', JSON.stringify(config.controllers));
+    safeSetItem('pink69_controllers', JSON.stringify(config.controllers));
   }
   if (config.moderators !== undefined) {
-    localStorage.setItem('pink69_moderators', JSON.stringify(config.moderators));
+    safeSetItem('pink69_moderators', JSON.stringify(config.moderators));
   }
   if (config.standOpen !== undefined) {
-    localStorage.setItem('pink69_stand_open', JSON.stringify(config.standOpen));
+    safeSetItem('pink69_stand_open', JSON.stringify(config.standOpen));
   }
   if (config.standLocked !== undefined) {
-    localStorage.setItem('pink69_stand_locked', JSON.stringify(config.standLocked));
+    safeSetItem('pink69_stand_locked', JSON.stringify(config.standLocked));
   }
   if (config.specialDuties !== undefined) {
-    localStorage.setItem('pink69_special_duties', JSON.stringify(config.specialDuties));
+    safeSetItem('pink69_special_duties', JSON.stringify(config.specialDuties));
   }
   if (config.athleteQr !== undefined) {
-    localStorage.setItem('pink69_athlete_qr', JSON.stringify(config.athleteQr));
+    safeSetItem('pink69_athlete_qr', JSON.stringify(config.athleteQr));
   }
   if (config.processionQr !== undefined) {
-    localStorage.setItem('pink69_procession_qr', JSON.stringify(config.processionQr));
+    safeSetItem('pink69_procession_qr', JSON.stringify(config.processionQr));
   }
   if (config.processionLimit !== undefined) {
-    localStorage.setItem('pink69_procession_limit', String(config.processionLimit));
+    safeSetItem('pink69_procession_limit', String(config.processionLimit));
   }
   if (config.processionTitle !== undefined) {
-    localStorage.setItem('pink69_procession_title', config.processionTitle);
+    safeSetItem('pink69_procession_title', config.processionTitle);
   }
 
   if (actor && action) {
@@ -616,7 +647,7 @@ export function saveSystemConfig(config: {
       action,
     };
     const updatedLogs = [newLog, ...logs].slice(0, 200);
-    localStorage.setItem('pink69_logs', JSON.stringify(updatedLogs));
+    safeSetItem('pink69_logs', JSON.stringify(updatedLogs));
   }
 
   notify();
@@ -751,13 +782,13 @@ export function updateStudent(studentId: string, updates: Partial<Student>, acto
 
     // 2. Update ID in controllers
     if (typeof window !== 'undefined') {
-      const controllersRaw = localStorage.getItem('pink69_controllers');
+      const controllersRaw = safeGetItem('pink69_controllers');
       if (controllersRaw) {
         try {
           const controllers: string[] = JSON.parse(controllersRaw);
           if (controllers.includes(studentId)) {
             const nextControllers = controllers.map(id => id === studentId ? updates.id! : id);
-            localStorage.setItem('pink69_controllers', JSON.stringify(nextControllers));
+            safeSetItem('pink69_controllers', JSON.stringify(nextControllers));
           }
         } catch (e) {
           console.error('Failed to parse controllers for ID update:', e);
@@ -817,14 +848,14 @@ export function deleteStudent(studentId: string, actor?: Student) {
     const otherStudents = nextStudents.filter((s: Student) => s.classroom !== classroom);
 
     // เรียงตามเลขที่เดิม
-    classStudents.sort((a: any, b: any) => {
+    classStudents.sort((a: Student, b: Student) => {
       const numA = parseInt(a.number, 10) || 999;
       const numB = parseInt(b.number, 10) || 999;
       return numA - numB;
     });
 
     // รันเลขที่ใหม่ 1, 2, 3...
-    const updatedClassStudents = classStudents.map((s: any, idx: number) => ({
+    const updatedClassStudents = classStudents.map((s: Student, idx: number) => ({
       ...s,
       number: String(idx + 1)
     }));
@@ -1113,18 +1144,18 @@ export function removeSportsEvent(eventId: string, actor?: Student) {
 export function saveStoredData(students: Student[], sports: SportsEvent[], announcements?: Announcement[]) {
   if (typeof window === 'undefined') return;
   const { logs } = getStoredData();
-  localStorage.setItem('pink69_students', JSON.stringify(students));
-  localStorage.setItem('pink69_sports', JSON.stringify(sports));
+  safeSetItem('pink69_students', JSON.stringify(students));
+  safeSetItem('pink69_sports', JSON.stringify(sports));
   if (announcements) {
-    localStorage.setItem('pink69_announcements', JSON.stringify(announcements));
+    safeSetItem('pink69_announcements', JSON.stringify(announcements));
   }
-  localStorage.setItem('pink69_logs', JSON.stringify(logs));
+  safeSetItem('pink69_logs', JSON.stringify(logs));
   notify();
 }
 
 export function saveSystemReports(reports: SystemReport[]) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem('pink69_reports', JSON.stringify(reports));
+  safeSetItem('pink69_reports', JSON.stringify(reports));
   notify();
 }
 
