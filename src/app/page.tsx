@@ -46,257 +46,74 @@ import {
   saveStoredData,
 } from './store';
 import { Duty, SportsEvent, Student } from './mockData';
+import { Tab, ArmPoseEquipment, ArmPose, SubSegment } from './types';
+import {
+  rows,
+  columns,
+  classroomSortKey,
+  createId,
+  fileToDataUrl,
+  segmentThaiGraphemes,
+  segmentThaiWords,
+  getWordBoundaries,
+  getSegmentText,
+  getSegmentTaggedWords,
+  buildSubSegments,
+  isArmPoseString,
+  parseArmPose,
+  serializeArmPose,
+  getEquipmentDisplayName,
+  getEquipmentColor,
+  getSeatColorStyle,
+  getResolvedVisuals,
+} from '../lib/helpers';
+import { Panel, StatCard, MiniCount, DutyCard } from '../components/ui';
+import { SeatGrid } from '../components/ui/SeatGrid';
 
-type Tab = 'dashboard' | 'apply' | 'announcements' | 'registry' | 'choreo' | 'admin' | 'reports' | 'athlete_events';
+// classroomSortKey, createId, fileToDataUrl — now imported from lib/helpers
 
-const rows = ['I', 'H', 'G', 'F', 'E', 'D', 'C', 'B', 'A'];
-const columns = Array.from({ length: 20 }, (_, i) => i + 1);
 
-const classroomSortKey = (classroom: string) => {
-  const match = classroom.match(/ม\.(\d+)\/(\d+)/);
-  if (!match) return [99, 99, classroom] as const;
-  return [Number(match[1]), Number(match[2]), classroom] as const;
-};
 
-const createId = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
+// segmentThaiGraphemes — imported from lib/helpers
 
-const fileToDataUrl = (file: File) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-
-const getSeatColorStyle = (value: string, equipmentList: string[]): { className: string; style?: React.CSSProperties } => {
-  if (!value) return { className: 'bg-carbon-card border-pink-primary/10 text-text-tertiary hover:border-pink-primary/30' };
-  
-  if (isArmPoseString(value)) {
-    const pose = parseArmPose(value);
-    if (pose) {
-      return {
-        className: 'border font-bold',
-        style: {
-          backgroundColor: 'rgba(23, 26, 32, 0.4)',
-          color: pose.color,
-          borderColor: pose.color
-        }
-      };
-    }
-  }
-
-  const val = value.toLowerCase().trim();
-
-  // Try to extract hex color code in parentheses e.g. "ร่ม (#ff00ff)"
-  const hexMatch = val.match(/\((#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3})\)$/);
-  if (hexMatch) {
-    const hexColor = hexMatch[1];
-    // Calculate brightness to choose text color
-    let r = 0, g = 0, b = 0;
-    if (hexColor.length === 4) {
-      r = parseInt(hexColor[1] + hexColor[1], 16);
-      g = parseInt(hexColor[2] + hexColor[2], 16);
-      b = parseInt(hexColor[3] + hexColor[3], 16);
-    } else if (hexColor.length === 7) {
-      r = parseInt(hexColor.slice(1, 3), 16);
-      g = parseInt(hexColor.slice(3, 5), 16);
-      b = parseInt(hexColor.slice(5, 7), 16);
-    }
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    const textColor = brightness > 128 ? '#0f1016' : '#ffffff';
-    const borderColor = brightness > 128 ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.2)';
-    
-    return {
-      className: 'font-bold border',
-      style: {
-        backgroundColor: hexColor,
-        color: textColor,
-        borderColor: borderColor
-      }
-    };
-  }
-
-  // 1. Check explicit color suffix in parentheses first (e.g., "เพลตน้ำเงิน (แดง)")
-  if (val.endsWith('(ชมพู)') || val.endsWith('(pink)')) {
-    return { className: 'bg-pink-primary border-pink-accent text-white font-bold' };
-  }
-  if (val.endsWith('(ขาว)') || val.endsWith('(white)')) {
-    return { className: 'bg-[#ffffff] border-gray-300 text-[#0f1016] font-bold' };
-  }
-  if (val.endsWith('(เหลือง)') || val.endsWith('(yellow)') || val.endsWith('(ร่ม)')) {
-    return { className: 'bg-yellow-500 border-yellow-400 text-white font-bold' };
-  }
-  if (val.endsWith('(น้ำเงิน)') || val.endsWith('(blue)')) {
-    return { className: 'bg-blue-600 border-blue-400 text-white font-bold' };
-  }
-  if (val.endsWith('(เขียว)') || val.endsWith('(green)')) {
-    return { className: 'bg-green-600 border-green-400 text-white font-bold' };
-  }
-  if (val.endsWith('(แดง)') || val.endsWith('(red)')) {
-    return { className: 'bg-red-600 border-red-400 text-white font-bold' };
-  }
-
-  // 2. Fallback to general substring checks for compatibility with old names
-  if (val.includes('ชมพู') || val.includes('pink')) {
-    return { className: 'bg-pink-primary border-pink-accent text-white font-bold' };
-  }
-  if (val.includes('ขาว') || val.includes('white')) {
-    return { className: 'bg-[#ffffff] border-gray-300 text-[#0f1016] font-bold' };
-  }
-  if (val.includes('ร่ม') || val.includes('เหลือง') || val.includes('yellow') || val.includes('umbrella')) {
-    return { className: 'bg-yellow-500 border-yellow-400 text-white font-bold' };
-  }
-  if (val.includes('น้ำเงิน') || val.includes('blue')) {
-    return { className: 'bg-blue-600 border-blue-400 text-white font-bold' };
-  }
-  if (val.includes('เขียว') || val.includes('green')) {
-    return { className: 'bg-green-600 border-green-400 text-white font-bold' };
-  }
-  if (val.includes('แดง') || val.includes('red')) {
-    return { className: 'bg-red-600 border-red-400 text-white font-bold' };
-  }
-  
-  const idx = equipmentList.indexOf(value);
-  if (idx === 0) return { className: 'bg-pink-primary border-pink-accent text-white font-bold' };
-  if (idx === 1) return { className: 'bg-[#ffffff] border-gray-300 text-[#0f1016] font-bold' };
-  if (idx === 2) return { className: 'bg-yellow-500 border-yellow-400 text-white font-bold' };
-  if (idx === 3) return { className: 'bg-blue-600 border-blue-400 text-white font-bold' };
-  if (idx === 4) return { className: 'bg-green-600 border-green-400 text-white font-bold' };
-  
-  return { className: 'bg-pink-primary/30 border-pink-primary/50 text-white font-bold' };
-};
-
-const segmentThaiGraphemes = (text: string): string[] => {
-  const combiningMarks = /[\u0E31\u0E33\u0E34-\u0E3A\u0E47-\u0E4E]/;
-  const clusters: string[] = [];
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    if (combiningMarks.test(char) && clusters.length > 0) {
-      clusters[clusters.length - 1] += char;
-    } else {
-      clusters.push(char);
-    }
-  }
-  return clusters;
-};
 
 // Helper: get full text of a segment (all words joined)
-const getSegmentText = (seg: { words?: { text: string }[]; text?: string }): string => {
-  if (seg.words && seg.words.length > 0) {
-    return seg.words.map(w => w.text).join('');
-  }
-  return (seg as any).text || '';
-};
+// getSegmentText — imported from lib/helpers
+
 
 // Helper: get only tagged words (for card stunt / แปรอักษร)
-const getSegmentTaggedWords = (seg: { words?: { text: string; isTagged: boolean }[] }): { text: string; isTagged: boolean }[] => {
-  if (!seg.words) return [];
-  return seg.words.filter(w => w.isTagged);
-};
+// getSegmentTaggedWords — imported from lib/helpers
+
 
 // Helper: build flat list of (segmentIndex, wordText) for tagged words across all segments
 // This is the "sub-segment" list used in karaoke/playback
-interface SubSegment {
-  segmentIndex: number;
-  wordText: string;
-  segId: string;
-  wordIdx: number;
-}
-const buildSubSegments = (segments: { id: string; words?: { text: string; isTagged: boolean }[] }[]): SubSegment[] => {
-  const result: SubSegment[] = [];
-  segments.forEach((seg, segIdx) => {
-    if (!seg.words) return;
-    seg.words.forEach((w, wIdx) => {
-      if (w.isTagged) {
-        result.push({ segmentIndex: segIdx, wordText: w.text, segId: seg.id, wordIdx: wIdx });
-      }
-    });
-  });
-  return result;
-};
+// SubSegment, buildSubSegments — imported from lib/helpers
 
 
 
-const segmentThaiWords = (text: string): string[] => {
-  if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
-    try {
-      const segmenter = new Intl.Segmenter('th', { granularity: 'word' });
-      const segments = segmenter.segment(text);
-      return Array.from(segments).map(s => s.segment);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-  // Fallback: split by spaces and preserve them
-  return text.split(/(\s+)/).filter(Boolean);
-};
 
-const getWordBoundaries = (words: string[]): number[] => {
-  const boundaries: number[] = [];
-  let currentGraphemeCount = 0;
-  for (let i = 0; i < words.length; i++) {
-    const wordGraphemes = segmentThaiGraphemes(words[i]);
-    currentGraphemeCount += wordGraphemes.length;
-    boundaries.push(currentGraphemeCount - 1);
-  }
-  return boundaries;
-};
+// segmentThaiWords — imported from lib/helpers
 
-interface ArmPose {
-  upperArmAngle: number;
-  forearmAngle: number;
-  handAngle: number;
-}
 
-interface ArmPoseEquipment {
-  type: 'arm_pose';
-  name: string;
-  color: string;
-  leftArm: ArmPose;
-  rightArm: ArmPose;
-  isSymmetric: boolean;
-  armThickness?: number;
-  armLength?: number;
-  centerX?: number;
-  centerY?: number;
-  shoulderDistance?: number;
-}
+// getWordBoundaries — imported from lib/helpers
 
-const isArmPoseString = (value: string): boolean => {
-  return value ? value.startsWith('__ARMPOSE__:') : false;
-};
 
-const parseArmPose = (value: string): ArmPoseEquipment | null => {
-  if (!isArmPoseString(value)) return null;
-  try {
-    return JSON.parse(value.substring(12));
-  } catch (e) {
-    console.error("Failed to parse arm pose JSON", e);
-    return null;
-  }
-};
+// ArmPose, ArmPoseEquipment — imported from ./types
 
-const serializeArmPose = (pose: ArmPoseEquipment): string => {
-  return `__ARMPOSE__:${JSON.stringify(pose)}`;
-};
 
-const getEquipmentDisplayName = (equip: string): string => {
-  if (isArmPoseString(equip)) {
-    const pose = parseArmPose(equip);
-    return pose ? pose.name : 'ท่าแขน (ไม่ถูกต้อง)';
-  }
-  return equip;
-};
+// isArmPoseString — imported from lib/helpers
 
-const getEquipmentColor = (equip: string): string => {
-  if (isArmPoseString(equip)) {
-    const pose = parseArmPose(equip);
-    return pose ? pose.color : '#ffffff';
-  }
-  const hexMatch = equip.match(/\((#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3})\)$/);
-  if (hexMatch) return hexMatch[1];
-  return '#ffffff';
-};
+
+// parseArmPose — imported from lib/helpers
+
+// serializeArmPose — imported from lib/helpers
+
+
+// getEquipmentDisplayName — imported from lib/helpers
+
+
+// getEquipmentColor — imported from lib/helpers
+
 
 const ArmPoseMiniSVG: React.FC<{ pose: ArmPoseEquipment; className?: string }> = ({ pose, className }) => {
   const { 
@@ -1484,38 +1301,7 @@ function EditSegmentsModal({ isOpen, onClose, song, onSave, onSuccess }: EditSeg
   );
 }
 
-const getResolvedVisuals = (song: Song, targetSegIdx: number, targetWordIdx: number): Record<string, string> => {
-  const resolved: Record<string, string> = {};
-  if (!song || !song.segments) return resolved;
-  
-  for (let sIdx = 0; sIdx <= targetSegIdx; sIdx++) {
-    const seg = song.segments[sIdx];
-    if (!seg) continue;
-    
-    // Default visuals from segment
-    if (seg.visuals) {
-      Object.assign(resolved, seg.visuals);
-    }
-    
-    // Check words in this segment
-    const wordsLimit = sIdx === targetSegIdx ? targetWordIdx : ((seg.words?.length || 1) - 1);
-    if (seg.words && seg.words.length > 0) {
-      for (let wIdx = 0; wIdx <= wordsLimit; wIdx++) {
-        const w = seg.words[wIdx];
-        if (w && w.visuals) {
-          for (const [seat, val] of Object.entries(w.visuals)) {
-            if (val && val !== 'none') {
-              resolved[seat] = val;
-            } else if (val === 'none') {
-              resolved[seat] = ''; // เอาป้ายลง
-            }
-          }
-        }
-      }
-    }
-  }
-  return resolved;
-};
+// getResolvedVisuals — imported from lib/helpers
 
 export default function Home() {
   const [data, setData] = useState(() => getStoredData());
@@ -7993,178 +7779,12 @@ function showSummary() {
   );
 }
 
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-carbon-card border border-pink-primary/10 rounded-2xl p-5 shadow">
-      <h2 className="text-lg font-bold text-pink-primary mb-4">{title}</h2>
-      {children}
-    </div>
-  );
-}
+// Panel — imported from components/ui
 
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="p-4 bg-carbon-card border border-pink-primary/10 rounded-xl flex items-center gap-3 shadow">
-      <div className="w-10 h-10 rounded-lg bg-pink-primary/10 flex items-center justify-center text-pink-primary">{icon}</div>
-      <div>
-        <span className="block text-xl font-bold text-text-primary">{value}</span>
-        <span className="text-xs text-text-secondary">{label}</span>
-      </div>
-    </div>
-  );
-}
+// StatCard — imported from components/ui
 
-function MiniCount({ label, count }: { label: string; count: number }) {
-  return (
-    <div className="bg-carbon-card border border-pink-primary/10 rounded-xl p-3">
-      <p className="text-lg font-bold text-white">{count}</p>
-      <p className="text-[11px] text-text-secondary truncate">{label}</p>
-    </div>
-  );
-}
+// MiniCount — imported from components/ui
 
-function DutyCard({
-  title,
-  description,
-  count,
-  limit,
-  disabled,
-  active,
-  onApply,
-  onCancel,
-  qrCode,
-  lineLink,
-}: {
-  title: string;
-  description: string;
-  count: number;
-  limit?: number;
-  disabled: boolean;
-  active: boolean;
-  onApply: () => void;
-  onCancel: () => void;
-  qrCode?: string;
-  lineLink?: string;
-}) {
-  return (
-    <div className={`bg-carbon-card border rounded-2xl p-5 shadow space-y-4 ${active ? 'border-pink-primary/60' : 'border-pink-primary/10'}`}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="font-bold text-lg text-text-primary">{title}</h3>
-          <p className="text-xs text-text-secondary mt-1">{description}</p>
-        </div>
-        <span className="text-xs text-pink-primary bg-pink-primary/10 px-2 py-1 rounded-full whitespace-nowrap">
-          {limit ? (limit === 9999 ? `${count} คน` : `${count}/${limit} คน`) : `${count} คน`}
-        </span>
-      </div>
-      {active ? (
-        <div className="space-y-3">
-          <div className="text-green-400 bg-green-400/10 px-3 py-2 rounded-lg border border-green-400/20 text-sm font-semibold">
-            คุณสมัครหน้าที่นี้แล้ว
-          </div>
-          {(qrCode || lineLink) && (
-            <div className="bg-carbon-dark rounded-xl border border-pink-primary/5 p-3 space-y-2">
-              {qrCode && <img src={qrCode} alt={`QR ${title}`} className="max-h-44 rounded-lg mx-auto border border-pink-primary/10" />}
-              {lineLink && <a href={lineLink} target="_blank" rel="noreferrer" className="block text-center text-sm text-pink-primary hover:text-pink-accent font-semibold">เข้ากลุ่มติดตามข่าวสาร</a>}
-            </div>
-          )}
-          <button onClick={onCancel} className="w-full bg-carbon-light hover:bg-carbon-dark text-red-400 border border-red-500/20 py-2 rounded-lg text-sm font-semibold">
-            ยกเลิกใบสมัคร
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={onApply}
-          disabled={disabled}
-          className="w-full bg-pink-primary hover:bg-pink-accent disabled:bg-carbon-light disabled:text-text-tertiary disabled:cursor-not-allowed text-white py-2.5 rounded-lg text-sm font-semibold transition-colors"
-        >
-          สมัครหน้าที่นี้
-        </button>
-      )}
-    </div>
-  );
-}
+// DutyCard — imported from components/ui
 
-function SeatGrid({
-  currentUser,
-  isController,
-  getSeatOwner,
-  onSeatClick,
-}: {
-  currentUser: Student;
-  isController: boolean;
-  getSeatOwner: (seatLabel: string) => Student | undefined;
-  onSeatClick: (row: string, colNum: number) => void;
-}) {
-  return (
-    <div className="w-full select-none overflow-x-hidden py-2">
-      <div className="w-full space-y-1 sm:space-y-1.5 md:space-y-2">
-        {rows.map((row) => (
-          <div key={row} className="flex items-center gap-1 sm:gap-1.5">
-            {/* Row Label */}
-            <div className="w-6 sm:w-8 font-bold text-center text-text-secondary text-xs sm:text-sm">{row}</div>
-            
-            {/* Seat Columns */}
-            <div className="flex flex-1 justify-between gap-0.5 sm:gap-1">
-              {columns.map((col) => {
-                const label = `${row}${col}`;
-                const owner = getSeatOwner(label);
-                const isMySeat = owner?.id === currentUser.id;
-                return (
-                  <button
-                    key={label}
-                    onClick={() => onSeatClick(row, col)}
-                    className={`flex-1 aspect-square rounded-[3px] text-[7px] sm:text-[9px] md:text-[10px] font-semibold sm:font-bold transition-all border flex items-center justify-center p-0 ${
-                      owner
-                        ? isMySeat
-                          ? 'bg-green-500 text-white border-green-400 shadow shadow-green-500/20'
-                          : 'bg-pink-primary text-white border-pink-accent'
-                        : 'bg-carbon-light hover:bg-pink-primary/20 text-text-secondary hover:text-pink-primary border-pink-primary/10 hover:border-pink-primary/50'
-                    }`}
-                    title={owner ? `${label}: ${owner.fullname} (${owner.classroom})` : `${label}: ว่าง`}
-                    style={{ minWidth: '0' }}
-                  >
-                    {owner ? (
-                      isMySeat ? (
-                        <div className="flex flex-col items-center justify-center leading-none text-center w-full h-full p-0.5">
-                          <span className="text-[7px] sm:text-[9px] md:text-[10px] font-extrabold text-white/95">{label}</span>
-                          <span className="text-[7px] sm:text-[8.5px] md:text-[9.5px] font-semibold text-white/80">คุณ</span>
-                        </div>
-                      ) : (
-                        (() => {
-                          const nicknameMatch = owner.fullname.match(/\(([^)]+)\)/);
-                          const nickname = nicknameMatch ? nicknameMatch[1] : owner.fullname.split(' ')[0];
-                          const classShort = owner.classroom.replace('ม.', '');
-                          return (
-                            <div className="flex flex-col items-center justify-center leading-[1.1] text-center w-full h-full p-0.5 overflow-hidden">
-                              <span className="text-[7px] sm:text-[9px] md:text-[10px] font-extrabold text-white/95">{label}</span>
-                              <span className="text-[6.5px] sm:text-[8px] md:text-[9px] font-semibold text-white truncate max-w-full px-0.5">{nickname}</span>
-                              <span className="text-[5px] sm:text-[6px] md:text-[7px] text-white/80 truncate max-w-full font-medium">
-                                {classShort} <span className="hidden sm:inline">เลขที่ </span><span className="sm:hidden">#</span>{owner.number}
-                              </span>
-                            </div>
-                          );
-                        })()
-                      )
-                    ) : (
-                      label
-                    )}
-                  </button>
-
-                );
-              })}
-            </div>
-          </div>
-        ))}
-        {isController && <p className="text-xs text-text-tertiary text-center pt-2">ผู้ควบคุมคลิกที่นั่งที่ถูกจองเพื่อยกเลิกได้</p>}
-        
-        {/* Stage Indicator showing Row A is the frontmost */}
-        <div className="mt-4 pt-3 border-t border-pink-primary/5 text-center flex flex-col items-center justify-center gap-1">
-          <div className="px-6 py-1.5 bg-pink-primary/10 border border-pink-primary/20 rounded-full text-[10px] sm:text-xs font-bold text-pink-accent tracking-wider uppercase">
-            ▲ แถว A อยู่ข้างหน้าสุด (ติดสนาม/STAGE) | แถว I อยู่ข้างหลังสุด ▲
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+// SeatGrid — imported from components/ui/SeatGrid
