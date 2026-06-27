@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🩷 PINK69 — ระบบจัดการสแตนเชียร์สีชมพู
 
-## Getting Started
+ระบบจัดการสมาชิกและกิจกรรมสแตนเชียร์สีชมพู สำหรับงานกีฬาสี โรงเรียนนารีรัตน์จังหวัดแพร่
 
-First, run the development server:
+---
+
+## ✨ ฟีเจอร์หลัก
+
+| ฟีเจอร์ | รายละเอียด |
+|--------|-----------|
+| **ทะเบียนสี** | ดูรายชื่อสมาชิก กรองตามห้อง/หน้าที่ |
+| **หน้าที่พิเศษ** | สมัครและจัดการหน้าที่แปรอักษร นักกีฬา ขบวนพาเหรด |
+| **ระบบแปรอักษร** | วางแผนและซ้อมสัญลักษณ์แปรอักษร (Card Stunt) แบบ real-time |
+| **ประกาศ** | แจ้งข่าวสารจากผู้ควบคุมถึงสมาชิกทั้งหมด |
+| **รายงาน** | สรุปสถิติจำนวนสมาชิก หน้าที่ และกิจกรรมต่างๆ |
+| **กีฬา** | จัดการรายการแข่งขันและผู้เข้าแข่งขัน |
+
+---
+
+## 👥 Role ในระบบ
+
+| Role | สิทธิ์ |
+|------|-------|
+| **นักเรียน** | ดูข้อมูลตัวเอง สมัครหน้าที่ ซ้อมแปรอักษรส่วนตัว |
+| **ผู้ดูแล (Moderator)** | ดูข้อมูลทั้งหมด ไม่สามารถแก้ไขได้ |
+| **ผู้ควบคุม (Super Controller)** | จัดการข้อมูลทั้งหมด ตั้งค่าระบบ |
+
+---
+
+## 🚀 วิธีรันโปรเจคบน Local
+
+### 1. Clone และติดตั้ง
+
+```bash
+git clone https://github.com/ChitsNebula/Pinkmanager69.git
+cd Pinkmanager69
+npm install
+```
+
+### 2. ตั้งค่า Environment Variables
+
+```bash
+# คัดลอก template
+cp .env.example .env.local
+
+# แก้ไขค่าในไฟล์ .env.local ตามที่ได้รับ
+```
+
+### 3. รัน Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+เปิด [http://localhost:3000](http://localhost:3000) ในเบราว์เซอร์
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🏗️ โครงสร้างโปรเจค
 
-## Learn More
+```
+pink69/
+  src/
+    app/
+      page.tsx        — UI component หลัก
+      store.ts        — State management + localStorage
+      mockData.ts     — ข้อมูลเริ่มต้น
+      globals.css     — Global styles + CSS variables
+  public/             — Static assets
+  .env.example        — Template environment variables
+```
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🛠️ เทคโนโลยี
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Framework:** Next.js 16 (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS + Custom CSS Variables
+- **Icons:** Lucide React
+- **State:** Custom pub/sub store (localStorage)
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📝 License
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+โปรเจคนี้พัฒนาเพื่อใช้งานภายในโรงเรียนนารีรัตน์จังหวัดแพร่เท่านั้น
