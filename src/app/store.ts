@@ -3,6 +3,7 @@
 // Custom lightweight state store that uses localStorage to persist mock data
 // and trigger react updates across components (simple pub/sub)
 import { Student, SportsEvent, INITIAL_STUDENTS, INITIAL_SPORTS } from './mockData';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export interface Announcement {
   id: string;
@@ -1216,4 +1217,471 @@ export function importStudentsData(newStudents: Student[], mode: 'merge' | 'repl
 
   const updatedLogs = [newLog, ...logs].slice(0, 200);
   saveAll(finalStudents, sports, announcements, updatedLogs);
+}
+
+// ==============================================================================
+// Supabase Sync & Real-time Integration Helpers
+// ==============================================================================
+
+let isSupabaseLoaded = false;
+
+// 1. Helper สำหรับการอัปโหลดนักเรียนขึ้น Supabase (Batching)
+export async function uploadStudentsToSupabase(students: Student[]) {
+  if (!supabase) return;
+  const batchSize = 100;
+  for (let i = 0; i < students.length; i += batchSize) {
+    const batch = students.slice(i, i + batchSize).map(s => ({
+      id: s.id,
+      fullname: s.fullname,
+      classroom: s.classroom,
+      number: s.number,
+      role: s.role,
+      assigned_duty: s.assigned_duty,
+      duty_status: s.duty_status,
+      duties: s.duties || {},
+      seat: s.seat || null,
+      rejection_reason: s.rejection_reason || null,
+      avatar: s.avatar || null
+    }));
+    const { error } = await supabase.from('pink69_students').upsert(batch);
+    if (error) console.error('[Supabase Error] Failed to upload student batch:', error);
+  }
+}
+
+// 2. Helper สำหรับการส่งข้อมูลเพลง
+export async function uploadSongsToSupabase(songs: Song[]) {
+  if (!supabase) return;
+  try {
+    const songsData = songs.map(s => ({
+      id: s.id,
+      title: s.title,
+      lyrics: s.lyrics,
+      equipment: s.equipment,
+      segments: s.segments,
+      is_locked: s.isLocked
+    }));
+    const { error } = await supabase.from('pink69_songs').upsert(songsData);
+    if (error) console.error('[Supabase Error] Failed to upload songs:', error);
+  } catch (e) {
+    console.error('[Supabase Sync] Failed to upload songs:', e);
+  }
+}
+
+// 3. Helper สำหรับรายงานปัญหา
+export async function uploadReportsToSupabase(reports: SystemReport[]) {
+  if (!supabase) return;
+  try {
+    const reportsData = reports.map(s => ({
+      id: s.id,
+      student_id: s.studentId,
+      student_name: s.studentName,
+      classroom: s.classroom,
+      number: s.number,
+      subject: s.subject,
+      description: s.description,
+      status: s.status,
+      timestamp: s.timestamp
+    }));
+    const { error } = await supabase.from('pink69_reports').upsert(reportsData);
+    if (error) console.error('[Supabase Error] Failed to upload reports:', error);
+  } catch (e) {
+    console.error('[Supabase Sync] Failed to upload reports:', e);
+  }
+}
+
+// 4. Helper อัปโหลดทุกอย่าง (สำหรับ saveAll)
+export async function uploadAllToSupabase(
+  students: Student[],
+  sports: SportsEvent[],
+  announcements: Announcement[],
+  logs: ActivityLog[]
+) {
+  if (!supabase) return;
+  try {
+    await uploadStudentsToSupabase(students);
+    
+    const sportsData = sports.map(s => ({
+      id: s.id,
+      name: s.name,
+      category: s.category,
+      lineup: s.lineup
+    }));
+    await supabase.from('pink69_sports').upsert(sportsData);
+
+    const annData = announcements.map(s => ({
+      id: s.id,
+      title: s.title,
+      content: s.content,
+      image: s.image || null,
+      date: s.date,
+      created_by: s.createdBy
+    }));
+    await supabase.from('pink69_announcements').upsert(annData);
+
+    const logsData = logs.map(s => ({
+      id: s.id,
+      timestamp: s.timestamp,
+      actor_id: s.actorId,
+      actor_name: s.actorName,
+      actor_role: s.actorRole,
+      action: s.action,
+      target_name: s.targetName || null
+    }));
+    await supabase.from('pink69_logs').upsert(logsData);
+    
+  } catch (e) {
+    console.error('[Supabase Sync] Failed to upload all data:', e);
+  }
+}
+
+// 5. ดึงตารางใดตารางหนึ่งแบบเฉพาะเจาะจงเมื่อเกิดการเปลี่ยนแบบเรียลไทม์
+export async function syncSingleTable(table: string) {
+  if (!supabase) return;
+  try {
+    if (table === 'students') {
+      const { data, error } = await supabase.from('pink69_students').select('*');
+      if (!error && data) {
+        const parsed = data.map((s: any) => ({
+          id: s.id,
+          fullname: s.fullname,
+          classroom: s.classroom,
+          number: s.number,
+          role: s.role,
+          assigned_duty: s.assigned_duty,
+          duty_status: s.duty_status,
+          duties: s.duties || {},
+          seat: s.seat || undefined,
+          rejection_reason: s.rejection_reason || undefined,
+          avatar: s.avatar || undefined
+        }));
+        safeSetItem('pink69_students', JSON.stringify(parsed));
+      }
+    } else if (table === 'sports') {
+      const { data, error } = await supabase.from('pink69_sports').select('*');
+      if (!error && data) {
+        const parsed = data.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          category: s.category,
+          lineup: s.lineup || []
+        }));
+        safeSetItem('pink69_sports', JSON.stringify(parsed));
+      }
+    } else if (table === 'announcements') {
+      const { data, error } = await supabase.from('pink69_announcements').select('*').order('created_at', { ascending: false });
+      if (!error && data) {
+        const parsed = data.map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          content: s.content,
+          image: s.image || undefined,
+          date: s.date,
+          createdBy: s.created_by
+        }));
+        safeSetItem('pink69_announcements', JSON.stringify(parsed));
+      }
+    } else if (table === 'logs') {
+      const { data, error } = await supabase.from('pink69_logs').select('*').order('created_at', { ascending: false }).limit(200);
+      if (!error && data) {
+        const parsed = data.map((s: any) => ({
+          id: s.id,
+          timestamp: s.timestamp,
+          actorId: s.actor_id,
+          actorName: s.actor_name,
+          actorRole: s.actor_role,
+          action: s.action,
+          targetName: s.target_name || undefined
+        }));
+        safeSetItem('pink69_logs', JSON.stringify(parsed));
+      }
+    } else if (table === 'config') {
+      const { data, error } = await supabase.from('pink69_config').select('*');
+      if (!error && data) {
+        data.forEach((item: any) => {
+          safeSetItem('pink69_' + item.key, JSON.stringify(item.value));
+        });
+      }
+    } else if (table === 'songs') {
+      const { data, error } = await supabase.from('pink69_songs').select('*');
+      if (!error && data) {
+        const parsed = data.map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          lyrics: s.lyrics,
+          equipment: s.equipment || [],
+          segments: s.segments || [],
+          isLocked: s.is_locked
+        }));
+        safeSetItem('pink69_songs', JSON.stringify(parsed));
+      }
+    } else if (table === 'reports') {
+      const { data, error } = await supabase.from('pink69_reports').select('*').order('created_at', { ascending: false });
+      if (!error && data) {
+        const parsed = data.map((s: any) => ({
+          id: s.id,
+          studentId: s.student_id,
+          studentName: s.student_name,
+          classroom: s.classroom,
+          number: s.number,
+          subject: s.subject,
+          description: s.description,
+          status: s.status,
+          timestamp: s.timestamp
+        }));
+        safeSetItem('pink69_reports', JSON.stringify(parsed));
+      }
+    }
+    notify();
+  } catch (e) {
+    console.error('[Realtime Sync] Failed to sync table:', table, e);
+  }
+}
+
+// 6. ตั้งค่า Real-time Subscriptions ฟังการเปลี่ยนแปลงและอัปเดต React
+function setupRealtimeSubscriptions() {
+  if (!supabase) return;
+
+  supabase.channel('public:pink69_students')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_students' }, async () => {
+       await syncSingleTable('students');
+    })
+    .subscribe();
+
+  supabase.channel('public:pink69_announcements')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_announcements' }, async () => {
+       await syncSingleTable('announcements');
+    })
+    .subscribe();
+
+  supabase.channel('public:pink69_sports')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_sports' }, async () => {
+       await syncSingleTable('sports');
+    })
+    .subscribe();
+
+  supabase.channel('public:pink69_logs')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_logs' }, async () => {
+       await syncSingleTable('logs');
+    })
+    .subscribe();
+
+  supabase.channel('public:pink69_config')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_config' }, async () => {
+       await syncSingleTable('config');
+    })
+    .subscribe();
+
+  supabase.channel('public:pink69_songs')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_songs' }, async () => {
+       await syncSingleTable('songs');
+    })
+    .subscribe();
+
+  supabase.channel('public:pink69_reports')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_reports' }, async () => {
+       await syncSingleTable('reports');
+    })
+    .subscribe();
+}
+
+// 7. โหลดข้อมูลจาก Supabase ครั้งแรกเมื่อเปิดหน้าเว็บ (Hydration)
+export async function initializeSupabaseSync() {
+  if (typeof window === 'undefined' || !isSupabaseConfigured || !supabase) return;
+  if (isSupabaseLoaded) return;
+  
+  console.log('[Supabase Sync] Initializing Supabase sync...');
+  
+  try {
+    // 1. ดึงข้อมูลนักเรียน
+    const { data: dbStudents, error: studentsError } = await supabase
+      .from('pink69_students')
+      .select('*');
+      
+    if (!studentsError) {
+      if (dbStudents && dbStudents.length > 0) {
+        const parsedStudents = dbStudents.map((s: any) => ({
+          id: s.id,
+          fullname: s.fullname,
+          classroom: s.classroom,
+          number: s.number,
+          role: s.role,
+          assigned_duty: s.assigned_duty,
+          duty_status: s.duty_status,
+          duties: s.duties || {},
+          seat: s.seat || undefined,
+          rejection_reason: s.rejection_reason || undefined,
+          avatar: s.avatar || undefined
+        }));
+        safeSetItem('pink69_students', JSON.stringify(parsedStudents));
+      } else {
+        const localRaw = safeGetItem('pink69_students');
+        const localStudents = safeJsonParse(localRaw, INITIAL_STUDENTS);
+        await uploadStudentsToSupabase(localStudents);
+      }
+    }
+
+    // 2. ดึงข้อมูลกีฬา
+    const { data: dbSports, error: sportsError } = await supabase
+      .from('pink69_sports')
+      .select('*');
+      
+    if (!sportsError) {
+      if (dbSports && dbSports.length > 0) {
+        const parsedSports = dbSports.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          category: s.category,
+          lineup: s.lineup || []
+        }));
+        safeSetItem('pink69_sports', JSON.stringify(parsedSports));
+      } else {
+        const localRaw = safeGetItem('pink69_sports');
+        const localSports = safeJsonParse(localRaw, INITIAL_SPORTS);
+        const sportsData = localSports.map(s => ({
+          id: s.id,
+          name: s.name,
+          category: s.category,
+          lineup: s.lineup
+        }));
+        await supabase.from('pink69_sports').upsert(sportsData);
+      }
+    }
+
+    // 3. ดึงประกาศ
+    const { data: dbAnnouncements, error: annError } = await supabase
+      .from('pink69_announcements')
+      .select('*')
+      .order('created_at', { ascending: false });
+      
+    if (!annError) {
+      if (dbAnnouncements && dbAnnouncements.length > 0) {
+        const parsedAnn = dbAnnouncements.map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          content: s.content,
+          image: s.image || undefined,
+          date: s.date,
+          createdBy: s.created_by
+        }));
+        safeSetItem('pink69_announcements', JSON.stringify(parsedAnn));
+      } else {
+        const localRaw = safeGetItem('pink69_announcements');
+        const localAnn = safeJsonParse(localRaw, DEFAULT_ANNOUNCEMENTS);
+        const annData = localAnn.map(s => ({
+          id: s.id,
+          title: s.title,
+          content: s.content,
+          image: s.image || null,
+          date: s.date,
+          created_by: s.createdBy
+        }));
+        await supabase.from('pink69_announcements').upsert(annData);
+      }
+    }
+
+    // 4. ดึง Logs
+    const { data: dbLogs, error: logsError } = await supabase
+      .from('pink69_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(200);
+      
+    if (!logsError) {
+      if (dbLogs && dbLogs.length > 0) {
+        const parsedLogs = dbLogs.map((s: any) => ({
+          id: s.id,
+          timestamp: s.timestamp,
+          actorId: s.actor_id,
+          actorName: s.actor_name,
+          actorRole: s.actor_role,
+          action: s.action,
+          targetName: s.target_name || undefined
+        }));
+        safeSetItem('pink69_logs', JSON.stringify(parsedLogs));
+      }
+    }
+
+    // 5. ดึงข้อมูลการตั้งค่า Config
+    const { data: dbConfig, error: configError } = await supabase
+      .from('pink69_config')
+      .select('*');
+      
+    if (!configError && dbConfig && dbConfig.length > 0) {
+      dbConfig.forEach((item: any) => {
+        safeSetItem('pink69_' + item.key, JSON.stringify(item.value));
+      });
+    } else {
+      // อัปโหลด config เริ่มต้น
+      const configItems = [
+        { key: 'stand_open', value: false },
+        { key: 'stand_locked', value: false },
+        { key: 'athlete_qr', value: { qrCode: '', lineLink: '' } },
+        { key: 'procession_qr', value: { qrCode: '', lineLink: '' } },
+        { key: 'procession_limit', value: 150 },
+        { key: 'procession_title', value: 'ขบวนพาเหรด' },
+        { key: 'controllers', value: ['39967', '39998', '40059'] },
+        { key: 'moderators', value: [] },
+        { key: 'special_duties', value: DEFAULT_SPECIAL_DUTIES }
+      ];
+      for (const item of configItems) {
+        await supabase.from('pink69_config').upsert({ key: item.key, value: item.value });
+      }
+    }
+
+    // 6. ดึงข้อมูลเพลง (Songs)
+    const { data: dbSongs, error: songsError } = await supabase
+      .from('pink69_songs')
+      .select('*');
+      
+    if (!songsError) {
+      if (dbSongs && dbSongs.length > 0) {
+        const parsedSongs = dbSongs.map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          lyrics: s.lyrics,
+          equipment: s.equipment || [],
+          segments: s.segments || [],
+          isLocked: s.is_locked
+        }));
+        safeSetItem('pink69_songs', JSON.stringify(parsedSongs));
+      } else {
+        const localRaw = safeGetItem('pink69_songs');
+        const localSongs = safeJsonParse(localRaw, DEFAULT_SONGS);
+        await uploadSongsToSupabase(localSongs);
+      }
+    }
+
+    // 7. ดึงข้อมูลรายงาน (Reports)
+    const { data: dbReports, error: reportsError } = await supabase
+      .from('pink69_reports')
+      .select('*')
+      .order('created_at', { ascending: false });
+      
+    if (!reportsError) {
+      if (dbReports && dbReports.length > 0) {
+        const parsedReports = dbReports.map((s: any) => ({
+          id: s.id,
+          studentId: s.student_id,
+          studentName: s.student_name,
+          classroom: s.classroom,
+          number: s.number,
+          subject: s.subject,
+          description: s.description,
+          status: s.status,
+          timestamp: s.timestamp
+        }));
+        safeSetItem('pink69_reports', JSON.stringify(parsedReports));
+      }
+    }
+
+    isSupabaseLoaded = true;
+    console.log('[Supabase Sync] Sync initialized successfully.');
+    notify();
+    
+    // เริ่ม Real-time Subscriptions
+    setupRealtimeSubscriptions();
+
+  } catch (err) {
+    console.error('[Supabase Sync] Hydration failed:', err);
+  }
 }

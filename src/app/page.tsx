@@ -44,6 +44,7 @@ import {
   saveSystemReports,
   importStudentsData,
   saveStoredData,
+  initializeSupabaseSync,
 } from './store';
 import { Duty, SportsEvent, Student } from './mockData';
 import { Tab, ArmPoseEquipment, ArmPose, SubSegment } from './types';
@@ -912,6 +913,9 @@ export default function Home() {
   
   useEffect(() => {
     setMounted(true);
+    // เรียกโหลดข้อมูลจาก Supabase Real-time Sync แบบ Asynchronous
+    initializeSupabaseSync().catch(console.error);
+
     const unsubscribe = subscribe(() => {
       const next = getStoredData();
       setData(next);
@@ -1048,7 +1052,8 @@ export default function Home() {
 
     const isAllowed = data.controllers.includes(staffMember.id) || (data.moderators || []).includes(staffMember.id);
 
-    if (isAllowed && staffPassword === '123') {
+    const expectedPassword = process.env.NEXT_PUBLIC_STAFF_PASSWORD || '123';
+    if (isAllowed && staffPassword === expectedPassword) {
       setCurrentUserId(staffMember.id);
       setCurrentTab('admin');
       return;
