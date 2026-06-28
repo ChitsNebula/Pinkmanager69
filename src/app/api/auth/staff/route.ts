@@ -6,7 +6,15 @@ export async function POST(request: Request) {
     
     // ตรวจเช็คข้อมูล Staff credentials จาก Server-side environment variables
     // ปลอดภัย 100% เพราะไม่ใช้ prefix NEXT_PUBLIC_ และรันเฉพาะบนเซิร์ฟเวอร์
-    const correctPassword = process.env.STAFF_PASSWORD || '123';
+    const correctPassword = process.env.STAFF_PASSWORD;
+
+    if (!correctPassword) {
+      console.error('[API Auth Staff Error]: STAFF_PASSWORD is not configured on the server.');
+      return NextResponse.json({ 
+        success: false, 
+        message: 'ระบบเซิร์ฟเวอร์ยังไม่ได้ตั้งค่ารหัสผ่าน Staff' 
+      }, { status: 500 });
+    }
     
     if (password === correctPassword) {
       return NextResponse.json({ 
@@ -26,7 +34,4 @@ export async function POST(request: Request) {
       message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์' 
     }, { status: 500 });
   }
-}
-export async function GET() {
-  return NextResponse.json({ message: "Staff Authentication API endpoint active." });
 }

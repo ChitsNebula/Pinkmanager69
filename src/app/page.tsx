@@ -45,6 +45,7 @@ import {
   importStudentsData,
   saveStoredData,
   initializeSupabaseSync,
+  getSupabaseConnectionStatus,
 } from './store';
 import { Duty, SportsEvent, Student } from './mockData';
 import { Tab, ArmPoseEquipment, ArmPose, SubSegment } from './types';
@@ -73,7 +74,7 @@ import { Panel, StatCard, MiniCount, DutyCard, ErrorBoundary } from '../componen
 import { EditSegmentsModal } from '../components/modals/EditSegmentsModal';
 import { SeatGrid } from '../components/ui/SeatGrid';
 import { Navbar } from '../components/layout/Navbar';
-import { isSupabaseConfigured } from '../lib/supabase';
+
 import { LoginScreen } from '../components/layout/LoginScreen';
 import { AnnouncementsTab } from '../components/tabs/AnnouncementsTab';
 import { ReportsTab } from '../components/tabs/ReportsTab';
@@ -1423,7 +1424,7 @@ export default function Home() {
         setCurrentTab={setCurrentTab}
         setLightTheme={setLightTheme}
         handleLogout={handleLogout}
-        isSupabaseConnected={isSupabaseConfigured}
+        isSupabaseConnected={getSupabaseConnectionStatus()}
       />
 
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">

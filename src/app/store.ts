@@ -1224,6 +1224,11 @@ export function importStudentsData(newStudents: Student[], mode: 'merge' | 'repl
 // ==============================================================================
 
 let isSupabaseLoaded = false;
+let isSupabaseConnectedActual = false;
+
+export function getSupabaseConnectionStatus(): boolean {
+  return isSupabaseConnectedActual;
+}
 
 // 1. Helper สำหรับการอัปโหลดนักเรียนขึ้น Supabase (Batching)
 export async function uploadStudentsToSupabase(students: Student[]) {
@@ -1336,7 +1341,10 @@ export async function uploadAllToSupabase(
 
 // 5. ดึงตารางใดตารางหนึ่งแบบเฉพาะเจาะจงเมื่อเกิดการเปลี่ยนแบบเรียลไทม์
 export async function syncSingleTable(table: string) {
-  if (!supabase) return;
+  if (!supabase) {
+    isSupabaseConnectedActual = false;
+    return;
+  }
   try {
     if (table === 'students') {
       const { data, error } = await supabase.from('pink69_students').select('*');
@@ -1486,7 +1494,10 @@ function setupRealtimeSubscriptions() {
 
 // 7. โหลดข้อมูลจาก Supabase ครั้งแรกเมื่อเปิดหน้าเว็บ (Hydration)
 export async function initializeSupabaseSync() {
-  if (typeof window === 'undefined' || !isSupabaseConfigured || !supabase) return;
+  if (typeof window === 'undefined' || !isSupabaseConfigured || !supabase) {
+    isSupabaseConnectedActual = false;
+    return;
+  }
   if (isSupabaseLoaded) return;
   
   console.log('[Supabase Sync] Initializing Supabase sync...');
@@ -1675,6 +1686,7 @@ export async function initializeSupabaseSync() {
     }
 
     isSupabaseLoaded = true;
+    isSupabaseConnectedActual = true;
     console.log('[Supabase Sync] Sync initialized successfully.');
     notify();
     
@@ -1682,6 +1694,8 @@ export async function initializeSupabaseSync() {
     setupRealtimeSubscriptions();
 
   } catch (err) {
+    isSupabaseConnectedActual = false;
     console.error('[Supabase Sync] Hydration failed:', err);
+    notify();
   }
 }
