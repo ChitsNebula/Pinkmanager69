@@ -46,3 +46,6 @@ next-env.d.ts
 # student data & scripts (sensitive / not needed in repo)
 *.csv
 *.bat
+
+.vercel
+.env*

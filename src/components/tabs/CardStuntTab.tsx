@@ -375,6 +375,96 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
     saveSongs(nextSongs, currentUser, `แก้ไขคำร้องเพลง "${songName}"`);
   };
 
+  if (data.songs.length === 0) {
+    return (
+      <section className="space-y-6 text-white" onMouseUp={() => setIsMouseDown(false)}>
+        {/* Header info */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-text-primary">ระบบซ้อมแปรอักษรอัจฉริยะ (Card Stunt)</h2>
+            <p className="text-sm text-text-secondary">
+              {isController
+                ? 'ออกแบบโค้ดแปรอักษรตามคำร้องเพลงเชียร์ คอนโทรลสแตนผ่านระบบระบายสี และรัน Simulation'
+                : 'คู่มือและเครื่องมือซ้อมแปรอักษรส่วนตัวสำหรับสมาชิกบนสแตนเชียร์'}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-carbon-card border border-pink-primary/20 rounded-2xl p-8 text-center space-y-4 shadow-lg max-w-2xl mx-auto mt-8">
+          <div className="w-16 h-16 rounded-full bg-pink-primary/10 flex items-center justify-center mx-auto border border-pink-primary/20 text-pink-primary animate-pulse">
+            <AlertTriangle size={32} />
+          </div>
+          <h3 className="text-lg font-bold text-text-primary">ไม่มีข้อมูลเพลงในระบบ</h3>
+          <p className="text-sm text-text-secondary max-w-md mx-auto">
+            ขณะนี้ยังไม่มีเพลงแปรอักษรที่บันทึกไว้ในระบบ {isController && 'กรุณาเพิ่มเพลงใหม่เพื่อเริ่มต้นการออกแบบแปรอักษร'}
+          </p>
+          {isController && (
+            <button
+              type="button"
+              onClick={() => setShowAddSongModal(true)}
+              className="bg-pink-primary hover:bg-pink-accent text-white px-6 py-2.5 rounded-xl text-sm font-semibold transition-all inline-flex items-center gap-2 cursor-pointer mx-auto"
+            >
+              <Plus size={16} /> เพิ่มเพลงใหม่
+            </button>
+          )}
+        </div>
+
+        {/* Add Song Modal */}
+        {showAddSongModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn font-bold">
+            <div className="w-full max-w-md bg-carbon-card border border-pink-primary/25 rounded-3xl p-6 shadow-2xl relative text-white">
+              <button 
+                type="button"
+                onClick={() => setShowAddSongModal(false)} 
+                className="absolute top-4 right-4 text-text-secondary hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+              <h3 className="text-lg font-bold text-white mb-4">เพิ่มเพลงเชียร์และแปรอักษรใหม่</h3>
+              <form onSubmit={handleAddSong} className="space-y-4">
+                <div className="text-left">
+                  <label className="text-xs text-text-secondary block mb-1.5 font-semibold">ชื่อเพลง</label>
+                  <input 
+                    value={addSongTitle} 
+                    onChange={(e) => setAddSongTitle(e.target.value)} 
+                    placeholder="เช่น เพลงมาร์ชสีชมพู, เพลงบูมสี" 
+                    className="w-full bg-carbon-dark border border-pink-primary/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-primary text-white font-medium" 
+                    required 
+                  />
+                </div>
+                <div className="text-left">
+                  <label className="text-xs text-text-secondary block mb-1.5 font-semibold">เนื้อเพลง (วรรคคำด้วยเว้นวรรคเพื่อแยกท่อน)</label>
+                  <textarea 
+                    value={addSongLyrics} 
+                    onChange={(e) => setAddSongLyrics(e.target.value)} 
+                    placeholder="กรอกเนื้อเพลง เช่น:&#10;ชมพู ชมพูชมพู เก่งกาจ แกร่งกล้า" 
+                    rows={4} 
+                    className="w-full bg-carbon-dark border border-pink-primary/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-primary text-white font-medium resize-none" 
+                    required 
+                  />
+                </div>
+                <div className="flex gap-3 pt-3 border-t border-pink-primary/10">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowAddSongModal(false)} 
+                    className="flex-1 bg-carbon-light hover:bg-carbon-dark border border-pink-primary/10 text-white py-2.5 rounded-xl text-sm font-semibold transition-all"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="flex-1 bg-pink-primary hover:bg-pink-accent text-white py-2.5 rounded-xl text-sm font-semibold transition-all shadow-md shadow-pink-primary/20"
+                  >
+                    สร้างเพลงเชียร์
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </section>
+    );
+  }
 
   return (
     <>
