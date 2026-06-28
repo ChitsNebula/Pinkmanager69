@@ -45,12 +45,6 @@ export async function POST(request: Request) {
       isAuthenticated = inputHash === defaultHash;
     }
 
-    // 3. Fallback: อนุญาตให้ใช้รหัสผ่าน STAFF_PASSWORD จาก ENV (เช่น '123' หรือค่าสำหรับเทส)
-    const envStaffPassword = process.env.STAFF_PASSWORD;
-    if (!isAuthenticated && envStaffPassword && password === envStaffPassword) {
-      isAuthenticated = true;
-    }
-
     if (isAuthenticated) {
       return NextResponse.json({ 
         success: true, 

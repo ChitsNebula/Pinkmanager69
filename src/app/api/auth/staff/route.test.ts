@@ -106,23 +106,6 @@ describe('POST /api/auth/staff', () => {
     );
   });
 
-  it('ควร return 200 เมื่อใช้รหัสผ่าน STAFF_PASSWORD จาก ENV (สำหรับ backward compatibility)', async () => {
-    process.env.STAFF_PASSWORD = 'env-secret-123';
-    
-    // Mock คืนค่าเป็น empty config
-    mockMaybeSingle.mockResolvedValue({
-      data: { value: {} },
-      error: null,
-    });
-
-    const req = makeRequest({ username: '39967', password: 'env-secret-123' });
-    await POST(req);
-
-    expect(NextResponse.json).toHaveBeenCalledWith(
-      expect.objectContaining({ success: true }),
-    );
-  });
-
   it('ควร return 500 เมื่อเกิดข้อผิดพลาดจาก request body (JSON parse error)', async () => {
     const req = {
       json: jest.fn().mockRejectedValue(new Error('Invalid JSON')),
