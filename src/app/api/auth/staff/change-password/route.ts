@@ -64,12 +64,6 @@ export async function POST(request: Request) {
       isOldCorrect = oldInputHash === defaultHash;
     }
 
-    // fallback ENV password
-    const envStaffPassword = process.env.STAFF_PASSWORD;
-    if (!isOldCorrect && envStaffPassword && oldPassword === envStaffPassword) {
-      isOldCorrect = true;
-    }
-
     if (!isOldCorrect) {
       return NextResponse.json({ 
         success: false, 
