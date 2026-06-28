@@ -1511,7 +1511,18 @@ export async function initializeSupabaseSync() {
       .select('*');
       
     if (!studentsError) {
-      if (dbStudents && dbStudents.length > 0) {
+      const localRaw = safeGetItem('pink69_students');
+      const localStudents = safeJsonParse(localRaw, INITIAL_STUDENTS);
+
+      // นับจำนวนคนที่ได้รับการมอบหมายหน้าที่ (ที่ไม่ใช่ 'none')
+      const localWithDuties = localStudents.filter((s: any) => s.assigned_duty && s.assigned_duty !== 'none').length;
+      const dbWithDuties = dbStudents ? dbStudents.filter((s: any) => s.assigned_duty && s.assigned_duty !== 'none').length : 0;
+
+      console.log(`[Supabase Sync] Student duties check - Local: ${localWithDuties}, DB: ${dbWithDuties}`);
+
+      if (dbStudents && dbStudents.length > 0 && dbWithDuties >= localWithDuties) {
+        // ดึงจาก DB มาเซฟลงเครื่องเมื่อใน DB มีการระบุหน้าที่มากกว่าหรือเท่ากัน
+        console.log('[Supabase Sync] Hydrating students from Supabase to Local...');
         const parsedStudents = dbStudents.map((s: any) => ({
           id: s.id,
           fullname: s.fullname,
@@ -1527,8 +1538,8 @@ export async function initializeSupabaseSync() {
         }));
         safeSetItem('pink69_students', JSON.stringify(parsedStudents));
       } else {
-        const localRaw = safeGetItem('pink69_students');
-        const localStudents = safeJsonParse(localRaw, INITIAL_STUDENTS);
+        // อัปโหลดข้อมูลจากเครื่องขึ้น DB เมื่อในเครื่องมีข้อมูลหน้าที่มากกว่า (เช่น ตอนเพิ่งเชื่อม DB ใหม่)
+        console.log('[Supabase Sync] Uploading richer local student duties to Supabase...');
         await uploadStudentsToSupabase(localStudents);
       }
     }
