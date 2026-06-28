@@ -1631,11 +1631,38 @@ export async function initializeSupabaseSync() {
       .select('*');
       
     if (!configError && dbConfig && dbConfig.length > 0) {
-      dbConfig.forEach((item: any) => {
-        if (item.key !== 'staff_passwords') {
-          safeSetItem('pink69_' + item.key, JSON.stringify(item.value));
-        }
-      });
+      const localSpecialDutiesRaw = safeGetItem('pink69_special_duties');
+      const localSpecialDuties = safeJsonParse(localSpecialDutiesRaw, DEFAULT_SPECIAL_DUTIES);
+
+      const dbSpecialDutiesItem = dbConfig.find((item: any) => item.key === 'special_duties');
+      const dbSpecialDuties = dbSpecialDutiesItem ? dbSpecialDutiesItem.value : DEFAULT_SPECIAL_DUTIES;
+
+      const localLen = Array.isArray(localSpecialDuties) ? localSpecialDuties.length : 0;
+      const dbLen = Array.isArray(dbSpecialDuties) ? dbSpecialDuties.length : 0;
+
+      console.log(`[Supabase Sync] Special duties count - Local: ${localLen}, DB: ${dbLen}`);
+
+      if (localLen > dbLen) {
+        // อัปโหลด config ตัวที่เครื่องมีมากกว่าขึ้นฐานข้อมูล
+        console.log('[Supabase Sync] Uploading richer local special_duties to Supabase config...');
+        await supabase.from('pink69_config').upsert({ key: 'special_duties', value: localSpecialDuties });
+        
+        // สำหรับ key อื่นๆ ดึงจาก DB ตามปกติ ยกเว้นตัวที่เราเพิ่งอัปโหลด
+        dbConfig.forEach((item: any) => {
+          if (item.key !== 'staff_passwords' && item.key !== 'special_duties') {
+            safeSetItem('pink69_' + item.key, JSON.stringify(item.value));
+          }
+        });
+        // บันทึกตัวพิเศษของเราในเครื่องด้วย
+        safeSetItem('pink69_special_duties', JSON.stringify(localSpecialDuties));
+      } else {
+        // ดึงจาก DB มาเซฟลงเครื่องตามปกติ
+        dbConfig.forEach((item: any) => {
+          if (item.key !== 'staff_passwords') {
+            safeSetItem('pink69_' + item.key, JSON.stringify(item.value));
+          }
+        });
+      }
     } else {
       // อัปโหลด config เริ่มต้น
       const configItems = [
