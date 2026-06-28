@@ -535,12 +535,19 @@ function saveAll(
   safeSetItem('pink69_announcements', JSON.stringify(announcements));
   safeSetItem('pink69_logs', JSON.stringify(logs));
   notify();
+
+  if (supabase) {
+    uploadAllToSupabase(students, sports, announcements, logs).catch(err => {
+      console.error('[Supabase Sync] Error during saveAll background upload:', err);
+    });
+  }
 }
 
 export function saveSongs(songs: Song[], actor?: Student, action?: string) {
   if (typeof window === 'undefined') return;
   safeSetItem('pink69_songs', JSON.stringify(songs));
   
+  let updatedLogs: ActivityLog[] | null = null;
   if (actor && action) {
     const { logs } = getStoredData();
     const roleLabel = getRoleLabel(actor.role);
@@ -553,10 +560,21 @@ export function saveSongs(songs: Song[], actor?: Student, action?: string) {
       actorRole: roleLabel,
       action,
     };
-    const updatedLogs = [newLog, ...logs].slice(0, 200);
+    updatedLogs = [newLog, ...logs].slice(0, 200);
     safeSetItem('pink69_logs', JSON.stringify(updatedLogs));
   }
   notify();
+
+  if (supabase) {
+    uploadSongsToSupabase(songs).catch(err => {
+      console.error('[Supabase Sync] Error uploading songs in saveSongs:', err);
+    });
+    if (updatedLogs) {
+      uploadLogsToSupabase(updatedLogs).catch(err => {
+        console.error('[Supabase Sync] Error uploading logs in saveSongs:', err);
+      });
+    }
+  }
 }
 
 export function toggleSongLock(songId: string, actor?: Student): void {
@@ -566,6 +584,7 @@ export function toggleSongLock(songId: string, actor?: Student): void {
   if (!songsRaw) return;
   try {
     const songs: Song[] = JSON.parse(songsRaw);
+    let updatedLogs: ActivityLog[] | null = null;
     const updatedSongs = songs.map(s => {
       if (s.id === songId) {
         const nextLocked = !s.isLocked;
@@ -580,7 +599,7 @@ export function toggleSongLock(songId: string, actor?: Student): void {
             actorRole: roleLabel,
             action: nextLocked ? `ล็อคเพลง "${s.title}" เพื่อป้องกันการแก้ไข` : `ปลดล็อคเพลง "${s.title}" ให้สามารถแก้ไขได้`
           };
-          const updatedLogs = [newLog, ...logs].slice(0, 200);
+          updatedLogs = [newLog, ...logs].slice(0, 200);
           safeSetItem('pink69_logs', JSON.stringify(updatedLogs));
         }
         return { ...s, isLocked: nextLocked };
@@ -589,6 +608,17 @@ export function toggleSongLock(songId: string, actor?: Student): void {
     });
     safeSetItem('pink69_songs', JSON.stringify(updatedSongs));
     notify();
+
+    if (supabase) {
+      uploadSongsToSupabase(updatedSongs).catch(err => {
+        console.error('[Supabase Sync] Error uploading songs in toggleSongLock:', err);
+      });
+      if (updatedLogs) {
+        uploadLogsToSupabase(updatedLogs).catch(err => {
+          console.error('[Supabase Sync] Error uploading logs in toggleSongLock:', err);
+        });
+      }
+    }
   } catch (e) {
     console.error('Failed to toggle song lock:', e);
   }
@@ -635,6 +665,7 @@ export function saveSystemConfig(config: {
     safeSetItem('pink69_procession_title', config.processionTitle);
   }
 
+  let updatedLogs: ActivityLog[] | null = null;
   if (actor && action) {
     const { logs } = getStoredData();
     const roleLabel = getRoleLabel(actor.role);
@@ -647,11 +678,52 @@ export function saveSystemConfig(config: {
       actorRole: roleLabel,
       action,
     };
-    const updatedLogs = [newLog, ...logs].slice(0, 200);
+    updatedLogs = [newLog, ...logs].slice(0, 200);
     safeSetItem('pink69_logs', JSON.stringify(updatedLogs));
   }
 
   notify();
+
+  if (supabase) {
+    const promises: PromiseLike<any>[] = [];
+    if (config.controllers !== undefined) {
+      promises.push(supabase.from('pink69_config').upsert({ key: 'controllers', value: config.controllers }));
+    }
+    if (config.moderators !== undefined) {
+      promises.push(supabase.from('pink69_config').upsert({ key: 'moderators', value: config.moderators }));
+    }
+    if (config.standOpen !== undefined) {
+      promises.push(supabase.from('pink69_config').upsert({ key: 'stand_open', value: config.standOpen }));
+    }
+    if (config.standLocked !== undefined) {
+      promises.push(supabase.from('pink69_config').upsert({ key: 'stand_locked', value: config.standLocked }));
+    }
+    if (config.specialDuties !== undefined) {
+      promises.push(supabase.from('pink69_config').upsert({ key: 'special_duties', value: config.specialDuties }));
+    }
+    if (config.athleteQr !== undefined) {
+      promises.push(supabase.from('pink69_config').upsert({ key: 'athlete_qr', value: config.athleteQr }));
+    }
+    if (config.processionQr !== undefined) {
+      promises.push(supabase.from('pink69_config').upsert({ key: 'procession_qr', value: config.processionQr }));
+    }
+    if (config.processionLimit !== undefined) {
+      promises.push(supabase.from('pink69_config').upsert({ key: 'procession_limit', value: config.processionLimit }));
+    }
+    if (config.processionTitle !== undefined) {
+      promises.push(supabase.from('pink69_config').upsert({ key: 'procession_title', value: config.processionTitle }));
+    }
+    
+    Promise.all(promises).catch(err => {
+      console.error('[Supabase Sync] Error during saveSystemConfig upload:', err);
+    });
+
+    if (updatedLogs) {
+      uploadLogsToSupabase(updatedLogs).catch(err => {
+        console.error('[Supabase Sync] Error during saveSystemConfig logs upload:', err);
+      });
+    }
+  }
 }
 
 // ----------------------------------------------------------
@@ -1144,7 +1216,7 @@ export function removeSportsEvent(eventId: string, actor?: Student) {
 // Legacy compatibility  saveStoredData without logs (used by old callers)
 export function saveStoredData(students: Student[], sports: SportsEvent[], announcements?: Announcement[]) {
   if (typeof window === 'undefined') return;
-  const { logs } = getStoredData();
+  const { logs, announcements: currentAnnouncements } = getStoredData();
   safeSetItem('pink69_students', JSON.stringify(students));
   safeSetItem('pink69_sports', JSON.stringify(sports));
   if (announcements) {
@@ -1152,12 +1224,24 @@ export function saveStoredData(students: Student[], sports: SportsEvent[], annou
   }
   safeSetItem('pink69_logs', JSON.stringify(logs));
   notify();
+
+  if (supabase) {
+    uploadAllToSupabase(students, sports, announcements || currentAnnouncements, logs).catch(err => {
+      console.error('[Supabase Sync] Error uploading in saveStoredData:', err);
+    });
+  }
 }
 
 export function saveSystemReports(reports: SystemReport[]) {
   if (typeof window === 'undefined') return;
   safeSetItem('pink69_reports', JSON.stringify(reports));
   notify();
+
+  if (supabase) {
+    uploadReportsToSupabase(reports).catch(err => {
+      console.error('[Supabase Sync] Error uploading reports in saveSystemReports:', err);
+    });
+  }
 }
 
 export function importStudentsData(newStudents: Student[], mode: 'merge' | 'replace', actor?: Student) {
@@ -1233,23 +1317,39 @@ export function getSupabaseConnectionStatus(): boolean {
 // 1. Helper สำหรับการอัปโหลดนักเรียนขึ้น Supabase (Batching)
 export async function uploadStudentsToSupabase(students: Student[]) {
   if (!supabase) return;
-  const batchSize = 100;
-  for (let i = 0; i < students.length; i += batchSize) {
-    const batch = students.slice(i, i + batchSize).map(s => ({
-      id: s.id,
-      fullname: s.fullname,
-      classroom: s.classroom,
-      number: s.number,
-      role: s.role,
-      assigned_duty: s.assigned_duty,
-      duty_status: s.duty_status,
-      duties: s.duties || {},
-      seat: s.seat || null,
-      rejection_reason: s.rejection_reason || null,
-      avatar: s.avatar || null
-    }));
-    const { error } = await supabase.from('pink69_students').upsert(batch);
-    if (error) console.error('[Supabase Error] Failed to upload student batch:', error);
+  try {
+    const batchSize = 100;
+    for (let i = 0; i < students.length; i += batchSize) {
+      const batch = students.slice(i, i + batchSize).map(s => ({
+        id: s.id,
+        fullname: s.fullname,
+        classroom: s.classroom,
+        number: s.number,
+        role: s.role,
+        assigned_duty: s.assigned_duty,
+        duty_status: s.duty_status,
+        duties: s.duties || {},
+        seat: s.seat || null,
+        rejection_reason: s.rejection_reason || null,
+        avatar: s.avatar || null
+      }));
+      const { error } = await supabase.from('pink69_students').upsert(batch);
+      if (error) console.error('[Supabase Error] Failed to upload student batch:', error);
+    }
+
+    // ลบรายชื่อนักเรียนที่ไม่มีในเครื่อง
+    const { data: dbStudents, error: fetchError } = await supabase.from('pink69_students').select('id');
+    if (!fetchError && dbStudents) {
+      const dbIds = dbStudents.map((row: any) => row.id);
+      const currentIdsSet = new Set(students.map(s => s.id));
+      const idsToDelete = dbIds.filter(id => !currentIdsSet.has(id));
+      if (idsToDelete.length > 0) {
+        const { error: deleteError } = await supabase.from('pink69_students').delete().in('id', idsToDelete);
+        if (deleteError) console.error('[Supabase Error] Failed to delete removed students:', deleteError);
+      }
+    }
+  } catch (e) {
+    console.error('[Supabase Sync] Failed to upload students:', e);
   }
 }
 
@@ -1267,6 +1367,18 @@ export async function uploadSongsToSupabase(songs: Song[]) {
     }));
     const { error } = await supabase.from('pink69_songs').upsert(songsData);
     if (error) console.error('[Supabase Error] Failed to upload songs:', error);
+
+    // ลบเพลงที่ไม่มีในเครื่อง
+    const { data: dbSongs, error: fetchError } = await supabase.from('pink69_songs').select('id');
+    if (!fetchError && dbSongs) {
+      const dbIds = dbSongs.map((row: any) => row.id);
+      const currentIdsSet = new Set(songs.map(s => s.id));
+      const idsToDelete = dbIds.filter(id => !currentIdsSet.has(id));
+      if (idsToDelete.length > 0) {
+        const { error: deleteError } = await supabase.from('pink69_songs').delete().in('id', idsToDelete);
+        if (deleteError) console.error('[Supabase Error] Failed to delete removed songs:', deleteError);
+      }
+    }
   } catch (e) {
     console.error('[Supabase Sync] Failed to upload songs:', e);
   }
@@ -1289,8 +1401,118 @@ export async function uploadReportsToSupabase(reports: SystemReport[]) {
     }));
     const { error } = await supabase.from('pink69_reports').upsert(reportsData);
     if (error) console.error('[Supabase Error] Failed to upload reports:', error);
+
+    // ลบรายงานที่ไม่มีในเครื่อง
+    const { data: dbReports, error: fetchError } = await supabase.from('pink69_reports').select('id');
+    if (!fetchError && dbReports) {
+      const dbIds = dbReports.map((row: any) => row.id);
+      const currentIdsSet = new Set(reports.map(s => s.id));
+      const idsToDelete = dbIds.filter(id => !currentIdsSet.has(id));
+      if (idsToDelete.length > 0) {
+        const { error: deleteError } = await supabase.from('pink69_reports').delete().in('id', idsToDelete);
+        if (deleteError) console.error('[Supabase Error] Failed to delete removed reports:', deleteError);
+      }
+    }
   } catch (e) {
     console.error('[Supabase Sync] Failed to upload reports:', e);
+  }
+}
+
+// 3.5 Helper สำหรับการส่งข้อมูลกีฬา
+export async function uploadSportsToSupabase(sports: SportsEvent[]) {
+  if (!supabase) return;
+  try {
+    const sportsData = sports.map(s => ({
+      id: s.id,
+      name: s.name,
+      category: s.category,
+      lineup: s.lineup || []
+    }));
+    const { error: upsertError } = await supabase.from('pink69_sports').upsert(sportsData);
+    if (upsertError) console.error('[Supabase Error] Failed to upload sports:', upsertError);
+
+    // ลบรายการกีฬาที่ไม่มีในเครื่อง
+    const { data: dbSports, error: fetchError } = await supabase.from('pink69_sports').select('id');
+    if (!fetchError && dbSports) {
+      const dbIds = dbSports.map((row: any) => row.id);
+      const currentIdsSet = new Set(sports.map(s => s.id));
+      const idsToDelete = dbIds.filter(id => !currentIdsSet.has(id));
+      if (idsToDelete.length > 0) {
+        const { error: deleteError } = await supabase.from('pink69_sports').delete().in('id', idsToDelete);
+        if (deleteError) console.error('[Supabase Error] Failed to delete removed sports:', deleteError);
+      }
+    }
+  } catch (e) {
+    console.error('[Supabase Sync] Failed to upload sports:', e);
+  }
+}
+
+// 3.6 Helper สำหรับส่งประกาศ
+export async function uploadAnnouncementsToSupabase(announcements: Announcement[]) {
+  if (!supabase) return;
+  try {
+    const annData = announcements.map(s => ({
+      id: s.id,
+      title: s.title,
+      content: s.content,
+      image: s.image || null,
+      date: s.date,
+      created_by: s.createdBy
+    }));
+    const { error: upsertError } = await supabase.from('pink69_announcements').upsert(annData);
+    if (upsertError) console.error('[Supabase Error] Failed to upload announcements:', upsertError);
+
+    // ลบประกาศที่ไม่มีในเครื่อง
+    const { data: dbAnn, error: fetchError } = await supabase.from('pink69_announcements').select('id');
+    if (!fetchError && dbAnn) {
+      const dbIds = dbAnn.map((row: any) => row.id);
+      const currentIdsSet = new Set(announcements.map(s => s.id));
+      const idsToDelete = dbIds.filter(id => !currentIdsSet.has(id));
+      if (idsToDelete.length > 0) {
+        const { error: deleteError } = await supabase.from('pink69_announcements').delete().in('id', idsToDelete);
+        if (deleteError) console.error('[Supabase Error] Failed to delete removed announcements:', deleteError);
+      }
+    }
+  } catch (e) {
+    console.error('[Supabase Sync] Failed to upload announcements:', e);
+  }
+}
+
+// 3.7 Helper สำหรับส่งบันทึกการทำงาน (Logs)
+export async function uploadLogsToSupabase(logs: ActivityLog[]) {
+  if (!supabase) return;
+  try {
+    if (logs.length === 0) {
+      const { error: deleteError } = await supabase.from('pink69_logs').delete().neq('id', '');
+      if (deleteError) console.error('[Supabase Error] Failed to clear logs:', deleteError);
+      return;
+    }
+
+    const logsData = logs.map(s => ({
+      id: s.id,
+      timestamp: s.timestamp,
+      actor_id: s.actorId,
+      actor_name: s.actorName,
+      actor_role: s.actorRole,
+      action: s.action,
+      target_name: s.targetName || null
+    }));
+    const { error: upsertError } = await supabase.from('pink69_logs').upsert(logsData);
+    if (upsertError) console.error('[Supabase Error] Failed to upload logs:', upsertError);
+
+    // ลบ Logs ที่เกินใน DB เพื่อให้สอดคล้องกับขีดจำกัด 200 รายการหลักในเครื่อง
+    const { data: dbLogs, error: fetchError } = await supabase.from('pink69_logs').select('id');
+    if (!fetchError && dbLogs) {
+      const dbIds = dbLogs.map((row: any) => row.id);
+      const currentIdsSet = new Set(logs.map(s => s.id));
+      const idsToDelete = dbIds.filter(id => !currentIdsSet.has(id));
+      if (idsToDelete.length > 0) {
+        const { error: deleteError } = await supabase.from('pink69_logs').delete().in('id', idsToDelete);
+        if (deleteError) console.error('[Supabase Error] Failed to delete old logs:', deleteError);
+      }
+    }
+  } catch (e) {
+    console.error('[Supabase Sync] Failed to upload logs:', e);
   }
 }
 
@@ -1304,36 +1526,9 @@ export async function uploadAllToSupabase(
   if (!supabase) return;
   try {
     await uploadStudentsToSupabase(students);
-    
-    const sportsData = sports.map(s => ({
-      id: s.id,
-      name: s.name,
-      category: s.category,
-      lineup: s.lineup
-    }));
-    await supabase.from('pink69_sports').upsert(sportsData);
-
-    const annData = announcements.map(s => ({
-      id: s.id,
-      title: s.title,
-      content: s.content,
-      image: s.image || null,
-      date: s.date,
-      created_by: s.createdBy
-    }));
-    await supabase.from('pink69_announcements').upsert(annData);
-
-    const logsData = logs.map(s => ({
-      id: s.id,
-      timestamp: s.timestamp,
-      actor_id: s.actorId,
-      actor_name: s.actorName,
-      actor_role: s.actorRole,
-      action: s.action,
-      target_name: s.targetName || null
-    }));
-    await supabase.from('pink69_logs').upsert(logsData);
-    
+    await uploadSportsToSupabase(sports);
+    await uploadAnnouncementsToSupabase(announcements);
+    await uploadLogsToSupabase(logs);
   } catch (e) {
     console.error('[Supabase Sync] Failed to upload all data:', e);
   }
