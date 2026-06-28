@@ -1406,7 +1406,9 @@ export async function syncSingleTable(table: string) {
       const { data, error } = await supabase.from('pink69_config').select('*');
       if (!error && data) {
         data.forEach((item: any) => {
-          safeSetItem('pink69_' + item.key, JSON.stringify(item.value));
+          if (item.key !== 'staff_passwords') {
+            safeSetItem('pink69_' + item.key, JSON.stringify(item.value));
+          }
         });
       }
     } else if (table === 'songs') {
@@ -1619,7 +1621,9 @@ export async function initializeSupabaseSync() {
       
     if (!configError && dbConfig && dbConfig.length > 0) {
       dbConfig.forEach((item: any) => {
-        safeSetItem('pink69_' + item.key, JSON.stringify(item.value));
+        if (item.key !== 'staff_passwords') {
+          safeSetItem('pink69_' + item.key, JSON.stringify(item.value));
+        }
       });
     } else {
       // อัปโหลด config เริ่มต้น
@@ -1632,7 +1636,8 @@ export async function initializeSupabaseSync() {
         { key: 'procession_title', value: 'ขบวนพาเหรด' },
         { key: 'controllers', value: ['39967', '39998', '40059'] },
         { key: 'moderators', value: [] },
-        { key: 'special_duties', value: DEFAULT_SPECIAL_DUTIES }
+        { key: 'special_duties', value: DEFAULT_SPECIAL_DUTIES },
+        { key: 'staff_passwords', value: {} }
       ];
       for (const item of configItems) {
         await supabase.from('pink69_config').upsert({ key: item.key, value: item.value });

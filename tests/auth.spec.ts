@@ -70,8 +70,8 @@ test.describe('Login — สตาฟ (ผู้ควบคุม)', () => {
 
     // กรอก id ของ controller (39967 อยู่ใน defaultControllers)
     await page.locator('input[placeholder*="admin"]').fill('39967');
-    // กรอกรหัสผ่านที่ตั้งไว้ใน playwright.config.ts
-    await page.locator('input[placeholder*="123"]').fill('test-e2e-password');
+    // รหัสผ่านเริ่มต้นคือ ID ประจำตัวของคนนั้นๆ
+    await page.locator('input[placeholder*="123"]').fill('39967');
     // กดปุ่ม login
     await page.getByRole('button', { name: 'เข้าสู่ระบบผู้ควบคุม' }).click();
 

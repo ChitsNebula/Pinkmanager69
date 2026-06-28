@@ -15,6 +15,7 @@ interface NavbarProps {
   setLightTheme: (light: boolean) => void;
   handleLogout: () => void;
   isSupabaseConnected?: boolean;
+  onChangePasswordClick?: () => void;
 }
 
 export function Navbar({
@@ -26,6 +27,7 @@ export function Navbar({
   setLightTheme,
   handleLogout,
   isSupabaseConnected,
+  onChangePasswordClick,
 }: NavbarProps) {
   return (
     <header className="sticky top-0 z-50 glass-nav px-6 py-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -101,6 +103,16 @@ export function Navbar({
         >
           {lightTheme ? '☀️' : '🌙'}
         </button>
+
+        {isController && onChangePasswordClick && (
+          <button
+            onClick={onChangePasswordClick}
+            className="flex items-center justify-center p-2 rounded-lg bg-carbon-card border border-pink-primary/20 text-pink-primary hover:bg-pink-primary/10 transition-all cursor-pointer select-none"
+            title="เปลี่ยนรหัสผ่านผู้ควบคุม"
+          >
+            🔑
+          </button>
+        )}
         <div className="flex items-center gap-2 bg-carbon-card border border-pink-primary/20 px-3 py-1.5 rounded-lg text-sm shadow">
           <User size={16} className="text-pink-primary" />
           <span className="font-semibold text-text-primary text-xs md:text-sm">

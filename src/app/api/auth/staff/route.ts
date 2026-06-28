@@ -1,32 +1,68 @@
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
+import { supabase } from '@/lib/supabase';
+
+// Helper: แฮชรหัสผ่านด้วย SHA-256
+export function hashPassword(password: string): string {
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
 
 export async function POST(request: Request) {
   try {
     const { username, password } = await request.json();
     
-    // ตรวจเช็คข้อมูล Staff credentials จาก Server-side environment variables
-    // ปลอดภัย 100% เพราะไม่ใช้ prefix NEXT_PUBLIC_ และรันเฉพาะบนเซิร์ฟเวอร์
-    const correctPassword = process.env.STAFF_PASSWORD;
-
-    if (!correctPassword) {
-      console.error('[API Auth Staff Error]: STAFF_PASSWORD is not configured on the server.');
+    if (!username || !password) {
       return NextResponse.json({ 
         success: false, 
-        message: 'ระบบเซิร์ฟเวอร์ยังไม่ได้ตั้งค่ารหัสผ่าน Staff' 
-      }, { status: 500 });
+        message: 'กรุณากรอกผู้ใช้และรหัสผ่าน' 
+      }, { status: 400 });
     }
-    
-    if (password === correctPassword) {
+
+    // 1. ดึงข้อมูลรหัสผ่านที่แฮชแล้วจาก Supabase (ตาราง config)
+    let staffPasswords: Record<string, string> = {};
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('pink69_config')
+        .select('value')
+        .eq('key', 'staff_passwords')
+        .maybeSingle(); // ใช้ maybeSingle เผื่อยังไม่มี record
+        
+      if (!error && data && data.value) {
+        staffPasswords = data.value;
+      }
+    }
+
+    const inputHash = hashPassword(password);
+    let isAuthenticated = false;
+
+    // 2. ตรวจสอบความถูกต้องของรหัสผ่าน
+    if (username in staffPasswords) {
+      // มีการเปลี่ยนรหัสผ่านเฉพาะตัวแล้วในระบบ -> ตรวจสอบค่าแฮชที่บันทึกไว้
+      isAuthenticated = inputHash === staffPasswords[username];
+    } else {
+      // ยังไม่มีการเปลี่ยนรหัสผ่านเฉพาะตัว -> รหัสผ่านเริ่มต้นคือ ID ของตัวเอง (เช่น '39967')
+      const defaultHash = hashPassword(String(username));
+      isAuthenticated = inputHash === defaultHash;
+    }
+
+    // 3. Fallback: อนุญาตให้ใช้รหัสผ่าน STAFF_PASSWORD จาก ENV (เช่น '123' หรือค่าสำหรับเทส)
+    const envStaffPassword = process.env.STAFF_PASSWORD;
+    if (!isAuthenticated && envStaffPassword && password === envStaffPassword) {
+      isAuthenticated = true;
+    }
+
+    if (isAuthenticated) {
       return NextResponse.json({ 
         success: true, 
-        message: 'Authenticated successfully' 
+        message: 'เข้าสู่ระบบสำเร็จ' 
       });
     } else {
       return NextResponse.json({ 
         success: false, 
-        message: 'รหัสผ่าน Staff ไม่ถูกต้อง' 
+        message: 'รหัสผ่านผู้ควบคุมไม่ถูกต้อง' 
       }, { status: 401 });
     }
+
   } catch (error) {
     console.error('[API Auth Staff Error]:', error);
     return NextResponse.json({ 

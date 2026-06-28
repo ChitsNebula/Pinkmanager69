@@ -72,6 +72,7 @@ import {
 } from '../lib/helpers';
 import { Panel, StatCard, MiniCount, DutyCard, ErrorBoundary } from '../components/ui';
 import { EditSegmentsModal } from '../components/modals/EditSegmentsModal';
+import { ChangePasswordModal } from '../components/modals/ChangePasswordModal';
 import { SeatGrid } from '../components/ui/SeatGrid';
 import { Navbar } from '../components/layout/Navbar';
 
@@ -880,6 +881,7 @@ export default function Home() {
   const [newAnnouncementImage, setNewAnnouncementImage] = useState('');
   // Admin/Controller inputs and modal states are now handled inside AdminTab component
   const [lightTheme, setLightTheme] = useState<boolean>(true);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState<boolean>(false);
   // Seat assignment modal state (used by handleSeatClick and seat modal in page.tsx)
   const [selectedSeatForAssign, setSelectedSeatForAssign] = useState<string | null>(null);
   const [assignSearchQuery, setAssignSearchQuery] = useState<string>('');
@@ -1425,6 +1427,7 @@ export default function Home() {
         setLightTheme={setLightTheme}
         handleLogout={handleLogout}
         isSupabaseConnected={getSupabaseConnectionStatus()}
+        onChangePasswordClick={() => setShowChangePasswordModal(true)}
       />
 
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
@@ -1914,6 +1917,13 @@ export default function Home() {
         })()}
 
         {/* editingSpecialDuty modal is now handled locally in AdminTab component */}
+        {showChangePasswordModal && currentUser && (
+          <ChangePasswordModal
+            isOpen={showChangePasswordModal}
+            onClose={() => setShowChangePasswordModal(false)}
+            currentUser={currentUser}
+          />
+        )}
       </div>
 
 
