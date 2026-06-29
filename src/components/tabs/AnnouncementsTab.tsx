@@ -34,7 +34,7 @@ export function AnnouncementsTab({
       <div>
         <h2 className="text-2xl font-bold text-text-primary">ประกาศสีชมพู</h2>
         <p className="text-sm text-text-secondary">
-          สมาชิกอ่านได้ทุกคน ผู้ควบคุมเท่านั้นที่เพิ่มประกาศและแนบรูปได้
+          ติดตามข่าวสาร ประชาสัมพันธ์ และความเคลื่อนไหวล่าสุดของคณะสีชมพู
         </p>
       </div>
 
