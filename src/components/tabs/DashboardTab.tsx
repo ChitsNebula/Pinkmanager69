@@ -46,7 +46,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ data, currentUser })
           <span className="text-[11px] uppercase tracking-widest text-pink-primary font-bold bg-pink-primary/10 px-3 py-1 rounded-full border border-pink-primary/20">Dashboard</span>
           <h1 className="text-3xl md:text-4xl font-extrabold mt-3 mb-2 tracking-tight text-text-primary">ระบบจัดการหน้าที่สีชมพู</h1>
           <p className="text-text-secondary max-w-2xl text-sm leading-relaxed">
-            รวมสมัครหน้าที่ ประกาศสำคัญ ทะเบียนการทำงาน และการจองสแตนเชียร์ของพวกเราคณะสีชมพูไว้ในระบบเดียวแบบเรียลไทม์
+            ศูนย์กลางข้อมูลคณะสีชมพูแบบเรียลไทม์: ตรวจสอบโค้ดแปรอักษรรายบุคคล ติดตามประกาศสำคัญ เช็คตารางแข่งขันกีฬา และบันทึกประวัติการทำงานร่วมกัน
           </p>
           
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
