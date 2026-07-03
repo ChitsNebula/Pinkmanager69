@@ -111,7 +111,7 @@ export function LoginScreen({
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white mb-1">คณะสีชมพู</h1>
           <p className="text-xs text-text-secondary font-medium">
-            ระบบจัดการหน้าที่ สมัครกิจกรรม และประกาศกีฬาสี
+            ระบบติดตามข่าวสาร เช็คตารางแข่ง และดูโค้ดแปรอักษรรายบุคคล
           </p>
         </div>
 
