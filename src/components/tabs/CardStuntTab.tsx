@@ -1890,47 +1890,89 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
               </p>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {currentSong.segments[activeSegmentIndex]?.words.map((w, wIdx) => {
-                  const resolvedVisuals = getResolvedVisuals(currentSong, activeSegmentIndex, wIdx);
-                  return (
-                    <div key={wIdx} className="bg-carbon-dark border border-pink-primary/10 rounded-2xl p-4 flex flex-col items-center space-y-3">
-                      <div className="text-center">
-                        <span className="text-xs text-text-tertiary">คำที่ {wIdx + 1}</span>
-                        <h4 className="text-lg font-bold text-pink-accent mt-0.5">{w.text}</h4>
-                      </div>
-                      
-                      {/* Mini Seating Grid */}
-                      <div className="w-full aspect-[20/9] max-w-xs bg-carbon-light/30 border border-pink-primary/5 p-2 rounded-xl">
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(20, 1fr)', gap: '1px' }} className="w-full h-full">
-                          {rows.map(row => 
-                            columns.map(col => {
-                              const seatLabel = `${row}${col}`;
-                              const val = resolvedVisuals[seatLabel] || '';
-                              const colorStyle = getSeatColorStyle(val, currentSong.equipment);
-                              const seatBg = colorStyle.style?.backgroundColor || (
-                                colorStyle.className.includes('bg-pink-primary') ? '#ff2e93' : 
-                                colorStyle.className.includes('bg-[#ffffff]') ? '#ffffff' : 
-                                colorStyle.className.includes('bg-blue-600') ? '#2563eb' : 
-                                colorStyle.className.includes('bg-yellow-500') ? '#eab308' : 
-                                colorStyle.className.includes('bg-green-600') ? '#16a34a' : 
-                                colorStyle.className.includes('bg-red-600') ? '#dc2626' : 
-                                'rgba(255,255,255,0.05)'
-                              );
-                              return (
-                                <div 
-                                  key={seatLabel} 
-                                  style={{ backgroundColor: seatBg }} 
-                                  className="w-full h-full rounded-[1px] border-[0.5px] border-black/20"
-                                  title={seatLabel + (val ? `: ${val}` : '')}
-                                />
-                              );
-                            })
-                          )}
+                {(() => {
+                  const words = currentSong.segments[activeSegmentIndex]?.words || [];
+                  const groups: {
+                    wordIndices: number[];
+                    wordTexts: string[];
+                    visuals: Record<string, string>;
+                  }[] = [];
+
+                  // Helper: สร้างสตริงระบุค่าสีทุกที่นั่งในตารางเพื่อเทียบความเท่ากัน
+                  const serializeVisuals = (vis: Record<string, string>) => {
+                    return rows.map(r => columns.map(c => `${r}${c}:${vis[`${r}${c}`] || ''}`).join(',')).join(';');
+                  };
+
+                  words.forEach((w, wIdx) => {
+                    const resolvedVisuals = getResolvedVisuals(currentSong, activeSegmentIndex, wIdx);
+                    const serialized = serializeVisuals(resolvedVisuals);
+
+                    if (groups.length > 0 && (groups[groups.length - 1] as any).serializedKey === serialized) {
+                      // รวมเข้ากลุ่มก่อนหน้าถ้ารูปแบบแปรอักษรเหมือนกัน
+                      groups[groups.length - 1].wordIndices.push(wIdx);
+                      groups[groups.length - 1].wordTexts.push(w.text);
+                    } else {
+                      // สร้างกลุ่มใหม่
+                      groups.push({
+                        wordIndices: [wIdx],
+                        wordTexts: [w.text],
+                        visuals: resolvedVisuals,
+                        ...({ serializedKey: serialized } as any)
+                      });
+                    }
+                  });
+
+                  return groups.map((group, gIdx) => {
+                    const uniqueTexts = Array.from(new Set(group.wordTexts));
+                    const labelText = uniqueTexts.join(' / ');
+                    
+                    let indexText = '';
+                    if (group.wordIndices.length === 1) {
+                      indexText = `คำที่ ${group.wordIndices[0] + 1}`;
+                    } else {
+                      indexText = `คำที่ ${group.wordIndices[0] + 1} - ${group.wordIndices[group.wordIndices.length - 1] + 1}`;
+                    }
+
+                    return (
+                      <div key={gIdx} className="bg-carbon-dark border border-pink-primary/10 rounded-2xl p-4 flex flex-col items-center space-y-3">
+                        <div className="text-center">
+                          <span className="text-xs text-text-tertiary">{indexText}</span>
+                          <h4 className="text-lg font-bold text-pink-accent mt-0.5">{labelText}</h4>
+                        </div>
+                        
+                        {/* Mini Seating Grid */}
+                        <div className="w-full aspect-[20/9] max-w-xs bg-carbon-light/30 border border-pink-primary/5 p-2 rounded-xl">
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(20, 1fr)', gap: '1px' }} className="w-full h-full">
+                            {rows.map(row => 
+                              columns.map(col => {
+                                const seatLabel = `${row}${col}`;
+                                const val = group.visuals[seatLabel] || '';
+                                const colorStyle = getSeatColorStyle(val, currentSong.equipment);
+                                const seatBg = colorStyle.style?.backgroundColor || (
+                                  colorStyle.className.includes('bg-pink-primary') ? '#ff2e93' : 
+                                  colorStyle.className.includes('bg-[#ffffff]') ? '#ffffff' : 
+                                  colorStyle.className.includes('bg-blue-600') ? '#2563eb' : 
+                                  colorStyle.className.includes('bg-yellow-500') ? '#eab308' : 
+                                  colorStyle.className.includes('bg-green-600') ? '#16a34a' : 
+                                  colorStyle.className.includes('bg-red-600') ? '#dc2626' : 
+                                  'rgba(255,255,255,0.05)'
+                                );
+                                return (
+                                  <div 
+                                    key={seatLabel} 
+                                    style={{ backgroundColor: seatBg }} 
+                                    className="w-full h-full rounded-[1px] border-[0.5px] border-black/20"
+                                    title={seatLabel + (val ? `: ${val}` : '')}
+                                  />
+                                );
+                              })
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
               
               <div className="mt-8 flex justify-end">
