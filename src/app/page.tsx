@@ -971,7 +971,7 @@ export default function Home() {
   });
 
   const detectedStudent = data.students.find(
-    (s: Student) => s.classroom === loginClassroom && s.number === loginNumber
+    (s: Student) => s.classroom === loginClassroom && String(s.number) === String(loginNumber)
   );
   // roleLabel — now imported from lib/helpers
 
@@ -1032,7 +1032,7 @@ export default function Home() {
     e.preventDefault();
     setLoginError('');
     const student = data.students.find(
-      (s: Student) => s.classroom === loginClassroom && s.number === loginNumber && s.id === loginStudentId
+      (s: Student) => s.classroom === loginClassroom && String(s.number) === String(loginNumber) && s.id === loginStudentId
     );
     if (!student) {
       setLoginError('ไม่พบข้อมูลนักเรียน กรุณาตรวจสอบห้อง เลขที่ และรหัสประจำตัว');
