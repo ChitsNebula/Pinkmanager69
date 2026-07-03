@@ -97,7 +97,7 @@ export function RegistryTab({
         }
         
         if (!matchesText) {
-          const searchString = `${student.fullname} ${student.id} ${student.classroom} เลขที่ ${student.number}`.toLowerCase();
+          const searchString = `${student.fullname} ${student.id} ${student.classroom} เลขที่ ${student.number} ${student.contact || ''}`.toLowerCase();
           matchesText = searchString.includes(query) || 
                         student.classroom.replace(/\s+/g, '').toLowerCase().includes(query.replace(/\s+/g, '')) ||
                         `${student.classroom}/${student.number}`.toLowerCase().includes(query) ||
@@ -171,6 +171,7 @@ export function RegistryTab({
   const [editStudentRoom, setEditStudentRoom] = useState<string>('');
   const [editStudentNum, setEditStudentNum] = useState<string>('');
   const [editStudentId, setEditStudentId] = useState<string>('');
+  const [editStudentContact, setEditStudentContact] = useState<string>('');
   const [editStudentError, setEditStudentError] = useState<string>('');
 
   const [resetStudentTarget, setResetStudentTarget] = useState<Student | null>(null);
@@ -793,6 +794,7 @@ export function RegistryTab({
               <th className="py-3 px-4 font-semibold whitespace-nowrap">เลขที่</th>
               <th className="py-3 px-4 font-semibold whitespace-nowrap">หน้าที่</th>
               <th className="py-3 px-4 font-semibold whitespace-nowrap">สถานะ</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">ช่องทางติดต่อ</th>
               <th className="py-3 px-4 font-semibold whitespace-nowrap">ที่นั่ง</th>
               {isController && !isModerator && <th className="py-3 px-4 font-semibold text-right whitespace-nowrap">จัดการ</th>}
             </tr>
@@ -961,6 +963,7 @@ export function RegistryTab({
                       )}
                     </div>
                   </td>
+                  <td className="py-3 px-4 text-text-secondary text-xs">{student.contact || '-'}</td>
                   <td className="py-3 px-4 text-text-secondary font-bold">{student.seat || '-'}</td>
                   {isController && !isModerator && (
                     <td className="py-3 px-4 text-right">
@@ -974,6 +977,7 @@ export function RegistryTab({
                             setEditStudentRoom(student.classroom || '');
                             setEditStudentNum(student.number || '');
                             setEditStudentId(student.id || '');
+                            setEditStudentContact(student.contact || '');
                             setEditStudentError('');
                           }}
                           className="text-pink-accent hover:text-pink-primary text-xs font-semibold cursor-pointer"
@@ -1188,6 +1192,16 @@ export function RegistryTab({
                   placeholder="เลขประจำตัว 5 หลัก"
                 />
               </div>
+              <div>
+                <label className="text-xs text-text-secondary block mb-1.5 font-semibold">ช่องทางติดต่อ (Line ID / IG)</label>
+                <input
+                  type="text"
+                  value={editStudentContact}
+                  onChange={(e) => setEditStudentContact(e.target.value)}
+                  className="w-full bg-carbon-dark border border-pink-primary/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-primary text-white"
+                  placeholder="เช่น Line: line_id หรือ IG: ig_username"
+                />
+              </div>
 
               {editStudentError && (
                 <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl flex items-center gap-2">
@@ -1243,7 +1257,8 @@ export function RegistryTab({
                         id: newId,
                         fullname: finalFullname || editStudentTarget.fullname,
                         classroom: cleanRoom || editStudentTarget.classroom,
-                        number: cleanNum || editStudentTarget.number
+                        number: cleanNum || editStudentTarget.number,
+                        contact: editStudentContact.trim() || undefined
                       },
                       currentUser || undefined,
                       `แก้ไขข้อมูลสมาชิก (${finalFullname})`

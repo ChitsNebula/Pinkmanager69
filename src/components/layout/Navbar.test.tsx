@@ -44,30 +44,19 @@ const defaultProps = {
 };
 
 describe('Navbar — Supabase Status Indicator', () => {
-  it('แสดงข้อความ "Supabase" และ class สีเขียวเมื่อ isSupabaseConnected = true', () => {
-    render(<Navbar {...defaultProps} isSupabaseConnected={true} />);
-    // ข้อความ "Supabase" ต้องแสดงใน md breakpoint ขึ้นไป
-    expect(screen.getByText('Supabase')).toBeInTheDocument();
+  it('ไม่แสดง indicator เลยสำหรับสมาชิกปกติ (isController = false)', () => {
+    const { queryByTitle } = render(<Navbar {...defaultProps} isController={false} isSupabaseConnected={true} />);
+    expect(queryByTitle(/เชื่อมต่อฐานข้อมูล Supabase/)).toBeNull();
   });
 
-  it('แสดงข้อความ "Offline" เมื่อ isSupabaseConnected = false', () => {
-    render(<Navbar {...defaultProps} isSupabaseConnected={false} />);
-    expect(screen.getByText('Offline')).toBeInTheDocument();
-  });
-
-  it('แสดงข้อความ "Offline" เมื่อ isSupabaseConnected ไม่ได้ถูกส่งมา (undefined)', () => {
-    render(<Navbar {...defaultProps} />);
-    expect(screen.getByText('Offline')).toBeInTheDocument();
-  });
-
-  it('indicator มี title tooltip ที่ถูกต้องเมื่อ connected', () => {
-    render(<Navbar {...defaultProps} isSupabaseConnected={true} />);
+  it('indicator มี title tooltip ที่ถูกต้องเมื่อ connected สำหรับผู้ควบคุม', () => {
+    render(<Navbar {...defaultProps} isController={true} isSupabaseConnected={true} />);
     const indicator = screen.getByTitle(/เชื่อมต่อฐานข้อมูล Supabase/);
     expect(indicator).toBeInTheDocument();
   });
 
-  it('indicator มี title tooltip ที่ถูกต้องเมื่อ offline', () => {
-    render(<Navbar {...defaultProps} isSupabaseConnected={false} />);
+  it('indicator มี title tooltip ที่ถูกต้องเมื่อ offline สำหรับผู้ควบคุม', () => {
+    render(<Navbar {...defaultProps} isController={true} isSupabaseConnected={false} />);
     const indicator = screen.getByTitle(/ไม่ได้เชื่อมต่อ Supabase/);
     expect(indicator).toBeInTheDocument();
   });

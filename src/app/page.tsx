@@ -46,6 +46,7 @@ import {
   saveStoredData,
   initializeSupabaseSync,
   getSupabaseConnectionStatus,
+  updateStudentContact,
 } from './store';
 import { Duty, SportsEvent, Student } from './mockData';
 import { Tab, ArmPoseEquipment, ArmPose, SubSegment } from './types';
@@ -875,6 +876,11 @@ export default function Home() {
   const [staffPassword, setStaffPassword] = useState('');
   const [staffError, setStaffError] = useState('');
 
+  // States for student contact prompt
+  const [contactType, setContactType] = useState<'Line' | 'IG'>('Line');
+  const [contactValue, setContactValue] = useState('');
+  const [contactError, setContactError] = useState('');
+
   const [currentTab, setCurrentTab] = useState<Tab>('dashboard');
   const [newAnnouncementTitle, setNewAnnouncementTitle] = useState('');
   const [newAnnouncementContent, setNewAnnouncementContent] = useState('');
@@ -1413,6 +1419,86 @@ export default function Home() {
         setGuestReportDescription={setGuestReportDescription}
         handleSubmitGuestReport={handleSubmitGuestReport}
       />
+    );
+  }
+
+  // บังคับกรอกช่องทางติดต่อสำหรับสมาชิกทั่วไปที่ยังไม่มีข้อมูลติดต่อ
+  const needsContact = !isController && (!currentUser.contact || currentUser.contact.trim() === '');
+
+  const handleSaveContact = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!contactValue.trim()) {
+      setContactError('กรุณากรอกข้อมูลช่องทางการติดต่อ');
+      return;
+    }
+    const formattedContact = `${contactType}: ${contactValue.trim()}`;
+    updateStudentContact(currentUser.id, formattedContact);
+    
+    // อัปเดตข้อมูล State ในหน้าจอทันทีเพื่อปิดป๊อปอัพ
+    setData(getStoredData());
+    setContactValue('');
+    setContactError('');
+  };
+
+  if (needsContact) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-carbon-dark">
+        <div className="w-full max-w-[460px] glass-panel rounded-[32px] p-8 shadow-2xl shadow-pink-primary/10 relative overflow-hidden border border-pink-primary/15 text-center">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-pink-primary via-pink-accent to-pink-primary" />
+          
+          <div className="w-16 h-16 bg-gradient-to-tr from-pink-primary/15 to-pink-accent/5 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-pink-primary/30 shadow-md shadow-pink-primary/10">
+            <Award size={36} className="text-pink-primary drop-shadow-[0_2px_8px_rgba(255,46,147,0.4)]" />
+          </div>
+          
+          <h2 className="text-2xl font-bold tracking-tight text-white mb-2">ยินดีต้อนรับสู่คณะสีชมพู</h2>
+          <p className="text-sm text-text-secondary leading-relaxed mb-6">
+            กรุณาระบุช่องทางการติดต่อ เพื่อความสะดวกสำหรับพี่สตาฟและผู้ควบคุมในการประสานงานดูแล
+          </p>
+
+          <form onSubmit={handleSaveContact} className="space-y-4 text-left">
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+                เลือกประเภทช่องทางติดต่อ
+              </label>
+              <select
+                value={contactType}
+                onChange={(e) => setContactType(e.target.value as 'Line' | 'IG')}
+                className="w-full bg-carbon-dark border border-pink-primary/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-primary text-white cursor-pointer"
+              >
+                <option value="Line">Line ID</option>
+                <option value="IG">Instagram (IG)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+                ป้อนไอดีของคุณ
+              </label>
+              <input
+                type="text"
+                value={contactValue}
+                onChange={(e) => setContactValue(e.target.value)}
+                placeholder={contactType === 'Line' ? 'ตัวอย่าง: line_username' : 'ตัวอย่าง: ig_username'}
+                className="w-full bg-carbon-dark border border-pink-primary/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-primary text-white"
+                required
+              />
+            </div>
+
+            {contactError && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs px-4 py-2.5 rounded-xl text-center">
+                {contactError}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="w-full bg-gradient-to-r from-pink-primary to-pink-accent hover:from-pink-accent hover:to-pink-primary text-white font-bold py-3 px-4 rounded-xl text-sm transition-all duration-300 shadow-lg shadow-pink-primary/20 hover:shadow-pink-primary/35 flex items-center justify-center gap-2 cursor-pointer mt-4"
+            >
+              บันทึกข้อมูลและเข้าสู่ระบบ
+            </button>
+          </form>
+        </div>
+      </div>
     );
   }
 

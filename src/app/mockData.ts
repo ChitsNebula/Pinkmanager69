@@ -14,6 +14,7 @@ export interface Student {
   seat?: string; // e.g. A1, B17
   rejection_reason?: string; // เหตุผลที่ถูกปฏิเสธหน้าที่
   avatar?: string; // รูปถ่าย/รูปประจำตัวนักกีฬา (base64 string)
+  contact?: string;
 }
 
 export interface SportsEvent {

@@ -1331,7 +1331,8 @@ export async function uploadStudentsToSupabase(students: Student[]) {
         duties: s.duties || {},
         seat: s.seat || null,
         rejection_reason: s.rejection_reason || null,
-        avatar: s.avatar || null
+        avatar: s.avatar || null,
+        contact: s.contact || null
       }));
       const { error } = await supabase.from('pink69_students').upsert(batch);
       if (error) console.error('[Supabase Error] Failed to upload student batch:', error);
@@ -1555,7 +1556,8 @@ export async function syncSingleTable(table: string) {
           duties: s.duties || {},
           seat: s.seat || undefined,
           rejection_reason: s.rejection_reason || undefined,
-          avatar: s.avatar || undefined
+          avatar: s.avatar || undefined,
+          contact: s.contact || undefined
         }));
         safeSetItem('pink69_students', JSON.stringify(parsed));
       }
@@ -1729,7 +1731,8 @@ export async function initializeSupabaseSync() {
           duties: s.duties || {},
           seat: s.seat || undefined,
           rejection_reason: s.rejection_reason || undefined,
-          avatar: s.avatar || undefined
+          avatar: s.avatar || undefined,
+          contact: s.contact || undefined
         }));
         safeSetItem('pink69_students', JSON.stringify(parsedStudents));
       } else {
@@ -1933,7 +1936,29 @@ export async function initializeSupabaseSync() {
 
   } catch (err) {
     isSupabaseConnectedActual = false;
-    console.error('[Supabase Sync] Hydration failed:', err);
     notify();
   }
+}
+
+export function updateStudentContact(studentId: string, contact: string) {
+  const current = getStoredData();
+  const nextStudents = current.students.map((s: Student) => 
+    s.id === studentId ? { ...s, contact } : s
+  );
+  
+  const targetStudent = nextStudents.find(s => s.id === studentId);
+  const updatedLogs = [
+    {
+      id: 'log_' + Date.now(),
+      timestamp: new Date().toISOString(),
+      actorId: studentId,
+      actorName: targetStudent ? targetStudent.fullname : 'สมาชิก',
+      actorRole: 'สมาชิก',
+      action: `อัปเดตช่องทางการติดต่อ: "${contact}"`,
+      targetName: undefined
+    },
+    ...current.logs
+  ];
+
+  saveAll(nextStudents, current.sports, current.announcements, updatedLogs);
 }
