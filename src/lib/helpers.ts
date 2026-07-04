@@ -223,26 +223,23 @@ export const getResolvedVisuals = (
   const resolved: Record<string, string> = {};
   if (!song || !song.segments) return resolved;
 
-  for (let sIdx = 0; sIdx <= targetSegIdx; sIdx++) {
-    const seg = song.segments[sIdx];
-    if (!seg) continue;
+  const seg = song.segments[targetSegIdx];
+  if (!seg) return resolved;
 
-    if (seg.visuals) {
-      Object.assign(resolved, seg.visuals);
-    }
+  // เอารายการแปรอักษรระดับ Segment (ท่อนเพลง) มาตั้งต้นก่อน
+  if (seg.visuals) {
+    Object.assign(resolved, seg.visuals);
+  }
 
-    const wordsLimit = sIdx === targetSegIdx ? targetWordIdx : (seg.words?.length || 1) - 1;
-    if (seg.words && seg.words.length > 0) {
-      for (let wIdx = 0; wIdx <= wordsLimit; wIdx++) {
-        const w = seg.words[wIdx];
-        if (w && w.visuals) {
-          for (const [seat, val] of Object.entries(w.visuals)) {
-            if (val && val !== 'none') {
-              resolved[seat] = val;
-            } else if (val === 'none') {
-              resolved[seat] = '';
-            }
-          }
+  // ดึงข้อมูลแปรอักษรเฉพาะคำนี้ (ไม่สะสมทับคำก่อนหน้าโดยอัตโนมัติ เพื่อป้องกันคำที่ยังไม่ได้ทำโชว์ภาพเก่าค้าง)
+  if (seg.words && seg.words[targetWordIdx]) {
+    const w = seg.words[targetWordIdx];
+    if (w && w.visuals) {
+      for (const [seat, val] of Object.entries(w.visuals)) {
+        if (val && val !== 'none') {
+          resolved[seat] = val;
+        } else if (val === 'none') {
+          resolved[seat] = '';
         }
       }
     }

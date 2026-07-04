@@ -198,7 +198,6 @@ export function LoginScreen({
                 <span>
                   พบชื่อ: <strong>{detectedStudent.fullname}</strong>
                 </span>
-                <span className="text-text-secondary">{detectedStudent.id}</span>
               </div>
             )}
 

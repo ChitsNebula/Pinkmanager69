@@ -143,3 +143,12 @@ body {
 .theme-light .hover\:text-white:hover {
   color: var(--pink-primary) !important;
 }
+
+/* utility to hide scrollbars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}

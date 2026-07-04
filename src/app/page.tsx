@@ -43,6 +43,8 @@ import {
   SystemReport,
   saveSystemReports,
   importStudentsData,
+  saveColorHouseCheckins,
+  ColorHouseCheckin,
   saveStoredData,
   initializeSupabaseSync,
   getSupabaseConnectionStatus,
@@ -73,7 +75,6 @@ import {
 } from '../lib/helpers';
 import { Panel, StatCard, MiniCount, DutyCard, ErrorBoundary } from '../components/ui';
 import { EditSegmentsModal } from '../components/modals/EditSegmentsModal';
-import { ChangePasswordModal } from '../components/modals/ChangePasswordModal';
 import { SeatGrid } from '../components/ui/SeatGrid';
 import { Navbar } from '../components/layout/Navbar';
 
@@ -85,6 +86,7 @@ import { RegistryTab } from '../components/tabs/RegistryTab';
 import { AdminTab } from '../components/tabs/AdminTab';
 import { DashboardTab } from '../components/tabs/DashboardTab';
 import { CardStuntTab } from '../components/tabs/CardStuntTab';
+import { ColorHouseTab, getISOWeekKey } from '../components/tabs/ColorHouseTab';
 
 // classroomSortKey, createId, fileToDataUrl — now imported from lib/helpers
 
@@ -887,7 +889,6 @@ export default function Home() {
   const [newAnnouncementImage, setNewAnnouncementImage] = useState('');
   // Admin/Controller inputs and modal states are now handled inside AdminTab component
   const [lightTheme, setLightTheme] = useState<boolean>(true);
-  const [showChangePasswordModal, setShowChangePasswordModal] = useState<boolean>(false);
   // Seat assignment modal state (used by handleSeatClick and seat modal in page.tsx)
   const [selectedSeatForAssign, setSelectedSeatForAssign] = useState<string | null>(null);
   const [assignSearchQuery, setAssignSearchQuery] = useState<string>('');
@@ -1184,17 +1185,99 @@ export default function Home() {
     setNewAnnouncementImage('');
   };
 
+  const deleteAnnouncement = async (announcementId: string) => {
+    if (!currentUser || !isController) return;
+    const targetAnn = data.announcements.find((a: Announcement) => a.id === announcementId);
+    if (!targetAnn) return;
+
+    if (confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบประกาศ "${targetAnn.title}"?`)) {
+      const nextAnnouncements = data.announcements.filter((a: Announcement) => a.id !== announcementId);
+      saveAnnouncements(nextAnnouncements, currentUser, 'ลบประกาศ', targetAnn.title);
+    }
+  };
+
+  const handleColorHouseSubmit = async (photos: string[], taggedIds: string[]) => {
+    if (!currentUser) return;
+    
+    const weekKey = getISOWeekKey(new Date());
+    const taggedNames = taggedIds.map(id => {
+      if (id === currentUser.id) return currentUser.fullname;
+      const found = data.students.find(s => s.id === id);
+      return found ? found.fullname : `รหัส ${id}`;
+    });
+
+    const newCheckin: ColorHouseCheckin = {
+      id: `ch_${Date.now()}`,
+      submitterId: currentUser.id,
+      submitterName: currentUser.fullname,
+      date: new Date().toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }),
+      weekKey: weekKey,
+      photos: photos,
+      taggedStudentIds: taggedIds,
+      taggedStudentNames: taggedNames,
+      status: 'pending'
+    };
+
+    const nextCheckins = [newCheckin, ...(data.colorHouseCheckins || [])];
+    saveColorHouseCheckins(nextCheckins, currentUser, 'ส่งรายงานตัวเข้าบ้านสี', `จำนวนแท็ก ${taggedIds.length} คน`);
+  };
+
+  const handleColorHouseApprove = async (id: string, note?: string) => {
+    if (!currentUser || (!isController && !isModerator)) return;
+    
+    const target = (data.colorHouseCheckins || []).find(c => c.id === id);
+    if (!target) return;
+
+    const nextCheckins = (data.colorHouseCheckins || []).map(c => {
+      if (c.id === id) {
+        return {
+          ...c,
+          status: 'approved' as const,
+          approvedBy: currentUser.fullname,
+          approvedAt: new Date().toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }),
+          note: note || undefined
+        };
+      }
+      return c;
+    });
+
+    saveColorHouseCheckins(nextCheckins, currentUser, 'อนุมัติการเช็คชื่อเข้าบ้านสี', `ผู้ส่ง ${target.submitterName}`);
+  };
+
+  const handleColorHouseReject = async (id: string, note?: string) => {
+    if (!currentUser || (!isController && !isModerator)) return;
+    
+    const target = (data.colorHouseCheckins || []).find(c => c.id === id);
+    if (!target) return;
+
+    const nextCheckins = (data.colorHouseCheckins || []).map(c => {
+      if (c.id === id) {
+        return {
+          ...c,
+          status: 'rejected' as const,
+          approvedBy: currentUser.fullname,
+          approvedAt: new Date().toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }),
+          note: note || undefined
+        };
+      }
+      return c;
+    });
+
+    saveColorHouseCheckins(nextCheckins, currentUser, 'ปฏิเสธการเช็คชื่อเข้าบ้านสี', `ผู้ส่ง ${target.submitterName} (เหตุผล: ${note || '-'})`);
+  };
+
   // Special duties, athlete QR, and procession configs are now managed within AdminTab component
 
 
   const handleExportLogsToCSV = () => {
-    if (data.logs.length === 0) {
+    const backendLogs = data.logs.filter(log => log.actorRole !== 'สมาชิก');
+    if (backendLogs.length === 0) {
       alert('ไม่มีประวัติการบันทึกกิจกรรมให้ส่งออกครับ');
       return;
     }
     
     const headers = ['วันที่-เวลา', 'บทบาท', 'ผู้บันทึก', 'กิจกรรม', 'เป้าหมายที่ถูกจัดการ'];
-    const rows = data.logs.map(log => {
+    const rows = backendLogs.map(log => {
       const formattedDate = new Date(log.timestamp).toLocaleString('th-TH');
       return [
         formattedDate,
@@ -1513,7 +1596,6 @@ export default function Home() {
         setLightTheme={setLightTheme}
         handleLogout={handleLogout}
         isSupabaseConnected={getSupabaseConnectionStatus()}
-        onChangePasswordClick={() => setShowChangePasswordModal(true)}
       />
 
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
@@ -1538,6 +1620,7 @@ export default function Home() {
               newAnnouncementImage={newAnnouncementImage}
               setNewAnnouncementImage={setNewAnnouncementImage}
               addAnnouncement={addAnnouncement}
+              onDeleteAnnouncement={deleteAnnouncement}
             />
           </ErrorBoundary>
         )}
@@ -1561,6 +1644,20 @@ export default function Home() {
               isController={isController}
               isSuperController={isSuperController}
               lightTheme={lightTheme}
+            />
+          </ErrorBoundary>
+        )}
+
+        {currentTab === 'colorhouse' && (
+          <ErrorBoundary>
+            <ColorHouseTab
+              data={data}
+              currentUser={currentUser!}
+              isController={isController}
+              isModerator={isModerator}
+              onSubmitCheckin={handleColorHouseSubmit}
+              onApproveCheckin={handleColorHouseApprove}
+              onRejectCheckin={handleColorHouseReject}
             />
           </ErrorBoundary>
         )}
@@ -2003,13 +2100,6 @@ export default function Home() {
         })()}
 
         {/* editingSpecialDuty modal is now handled locally in AdminTab component */}
-        {showChangePasswordModal && currentUser && (
-          <ChangePasswordModal
-            isOpen={showChangePasswordModal}
-            onClose={() => setShowChangePasswordModal(false)}
-            currentUser={currentUser}
-          />
-        )}
       </div>
 
 

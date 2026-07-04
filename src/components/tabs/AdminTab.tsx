@@ -227,7 +227,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       </div>
 
       {/* Sub-tab Navigation */}
-      <div className="flex flex-wrap bg-carbon-card border border-pink-primary/10 rounded-2xl md:rounded-full p-1.5 w-max gap-1 mb-6 shadow-lg">
+      <div className="flex flex-nowrap overflow-x-auto no-scrollbar bg-carbon-card border border-pink-primary/10 rounded-2xl md:rounded-full p-1.5 w-full max-w-full gap-1 mb-6 shadow-lg scroll-smooth">
         {[
           { id: 'stand', label: '📣 จัดการสแตน' },
           { id: 'athlete', label: '🏃 จัดการนักกีฬา' },
@@ -239,7 +239,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
           <button
             key={sub!.id}
             onClick={() => setAdminSubTab(sub!.id as 'stand' | 'athlete' | 'procession' | 'special_duty' | 'logs' | 'roles')}
-            className={`px-4 py-2 rounded-xl md:rounded-full text-xs font-bold transition-all ${
+            className={`px-4 py-2 rounded-xl md:rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer select-none ${
               adminSubTab === sub!.id
                 ? 'bg-pink-primary text-white shadow-md shadow-pink-primary/20 scale-105'
                 : 'text-text-secondary hover:text-white hover:bg-carbon-light/30'
@@ -749,10 +749,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             </button>
           </div>
           <div className="space-y-3 max-h-80 overflow-y-auto pr-1 text-xs sm:text-sm">
-            {data.logs.length === 0 ? (
-              <p className="text-text-tertiary text-center italic py-4">ยังไม่มีประวัติการบันทึกกิจกรรมในระบบ</p>
-            ) : (
-              data.logs.map((log: ActivityLog) => (
+            {(() => {
+              const backendLogs = data.logs.filter((log: ActivityLog) => log.actorRole !== 'สมาชิก');
+              if (backendLogs.length === 0) {
+                return <p className="text-text-tertiary text-center italic py-4">ยังไม่มีประวัติการบันทึกกิจกรรมในระบบ</p>;
+              }
+              return backendLogs.map((log: ActivityLog) => (
                 <div key={log.id} className="bg-carbon-dark border border-pink-primary/5 rounded-xl p-3 hover:border-pink-primary/10 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-start sm:items-center gap-2">
                     <span className="bg-pink-primary/10 text-pink-accent px-2 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap">
@@ -768,8 +770,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     {new Date(log.timestamp).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
                   </span>
                 </div>
-              ))
-            )}
+              ));
+            })()}
           </div>
         </Panel>
       )}

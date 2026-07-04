@@ -14,6 +14,21 @@ export interface Announcement {
   createdBy?: string; // controller name
 }
 
+export interface ColorHouseCheckin {
+  id: string;
+  submitterId: string;
+  submitterName: string;
+  date: string;
+  weekKey: string;
+  photos: string[]; // array of base64 strings
+  taggedStudentIds: string[];
+  taggedStudentNames: string[];
+  status: 'pending' | 'approved' | 'rejected';
+  approvedBy?: string;
+  approvedAt?: string;
+  note?: string;
+}
+
 export interface ActivityLog {
   id: string;
   timestamp: string;       // ISO string
@@ -202,7 +217,8 @@ export function getStoredData() {
       processionLimit: 150,
       processionTitle: 'ขบวนพาเหรด',
       songs: DEFAULT_SONGS,
-      reports: DEFAULT_REPORTS
+      reports: DEFAULT_REPORTS,
+      colorHouseCheckins: [] as ColorHouseCheckin[]
     };
   }
   const studentsRaw = safeGetItem('pink69_students');
@@ -220,8 +236,10 @@ export function getStoredData() {
   const processionLimitRaw = safeGetItem('pink69_procession_limit');
   const processionTitleRaw = safeGetItem('pink69_procession_title');
   const songsRaw = safeGetItem('pink69_songs');
+  const checkinsRaw = safeGetItem('pink69_color_house_checkins');
 
   let rawStudents = safeJsonParse<Student[]>(studentsRaw, INITIAL_STUDENTS);
+  const colorHouseCheckins = safeJsonParse<ColorHouseCheckin[]>(checkinsRaw, []);
 
   // Auto-migration ม.3/13 v2
   if (typeof window !== 'undefined') {
@@ -520,7 +538,7 @@ export function getStoredData() {
     return next;
   });
 
-  return { students, sports, announcements, logs, controllers, moderators, standOpen, standLocked, specialDuties, athleteQr, processionQr, processionLimit, processionTitle, songs, reports };
+  return { students, sports, announcements, logs, controllers, moderators, standOpen, standLocked, specialDuties, athleteQr, processionQr, processionLimit, processionTitle, songs, reports, colorHouseCheckins };
 }
 
 function saveAll(
@@ -1517,6 +1535,83 @@ export async function uploadLogsToSupabase(logs: ActivityLog[]) {
   }
 }
 
+// Helper สำหรับอัปโหลดข้อมูลเช็คชื่อเข้าบ้านสีขึ้น Supabase
+export async function uploadColorHouseCheckinsToSupabase(checkins: ColorHouseCheckin[]) {
+  if (!supabase) return;
+  try {
+    const dataToUpload = checkins.map(c => ({
+      id: c.id,
+      submitter_id: c.submitterId,
+      submitter_name: c.submitterName,
+      date: c.date,
+      week_key: c.weekKey,
+      photos: c.photos,
+      tagged_student_ids: c.taggedStudentIds,
+      tagged_student_names: c.taggedStudentNames,
+      status: c.status,
+      approved_by: c.approvedBy || null,
+      approved_at: c.approvedAt || null,
+      note: c.note || null
+    }));
+
+    const { error: upsertError } = await supabase.from('pink69_color_house_checkins').upsert(dataToUpload);
+    if (upsertError) console.error('[Supabase Error] Failed to upload color house checkins:', upsertError);
+
+    // ลบรายการเช็คชื่อที่ไม่มีในเครื่อง
+    const { data: dbCheckins, error: fetchError } = await supabase.from('pink69_color_house_checkins').select('id');
+    if (!fetchError && dbCheckins) {
+      const dbIds = dbCheckins.map((row: any) => row.id);
+      const currentIdsSet = new Set(checkins.map(c => c.id));
+      const idsToDelete = dbIds.filter(id => !currentIdsSet.has(id));
+      if (idsToDelete.length > 0) {
+        const { error: deleteError } = await supabase.from('pink69_color_house_checkins').delete().in('id', idsToDelete);
+        if (deleteError) console.error('[Supabase Error] Failed to delete removed color house checkins:', deleteError);
+      }
+    }
+  } catch (e) {
+    console.error('[Supabase Sync] Failed to upload color house checkins:', e);
+  }
+}
+
+export function saveColorHouseCheckins(
+  checkins: ColorHouseCheckin[],
+  actor?: Student,
+  action?: string,
+  targetName?: string
+) {
+  if (typeof window === 'undefined') return;
+  safeSetItem('pink69_color_house_checkins', JSON.stringify(checkins));
+
+  let updatedLogs: ActivityLog[] | null = null;
+  if (actor && action) {
+    const data = getStoredData();
+    const newLog: ActivityLog = {
+      id: `l_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      actorId: actor.id,
+      actorName: actor.fullname,
+      actorRole: getRoleLabel(actor.role),
+      action: action,
+      targetName: targetName
+    };
+    updatedLogs = [newLog, ...data.logs].slice(0, 200);
+    safeSetItem('pink69_logs', JSON.stringify(updatedLogs));
+  }
+
+  notify();
+
+  if (supabase) {
+    uploadColorHouseCheckinsToSupabase(checkins).catch(err => {
+      console.error('[Supabase Sync] Error uploading color house checkins:', err);
+    });
+    if (updatedLogs) {
+      uploadLogsToSupabase(updatedLogs).catch(err => {
+        console.error('[Supabase Sync] Error uploading logs after color house checkin:', err);
+      });
+    }
+  }
+}
+
 // 4. Helper อัปโหลดทุกอย่าง (สำหรับ saveAll)
 export async function uploadAllToSupabase(
   students: Student[],
@@ -1637,6 +1732,25 @@ export async function syncSingleTable(table: string) {
         }));
         safeSetItem('pink69_reports', JSON.stringify(parsed));
       }
+    } else if (table === 'color_house_checkins') {
+      const { data, error } = await supabase.from('pink69_color_house_checkins').select('*').order('created_at', { ascending: false });
+      if (!error && data) {
+        const parsed = data.map((c: any) => ({
+          id: c.id,
+          submitterId: c.submitter_id,
+          submitterName: c.submitter_name,
+          date: c.date,
+          weekKey: c.week_key,
+          photos: c.photos || [],
+          taggedStudentIds: c.tagged_student_ids || [],
+          taggedStudentNames: c.tagged_student_names || [],
+          status: c.status,
+          approvedBy: c.approved_by || undefined,
+          approvedAt: c.approved_at || undefined,
+          note: c.note || undefined
+        }));
+        safeSetItem('pink69_color_house_checkins', JSON.stringify(parsed));
+      }
     }
     notify();
   } catch (e) {
@@ -1687,6 +1801,12 @@ function setupRealtimeSubscriptions() {
   supabase.channel('public:pink69_reports')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_reports' }, async () => {
        await syncSingleTable('reports');
+    })
+    .subscribe();
+
+  supabase.channel('public:pink69_color_house_checkins')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_color_house_checkins' }, async () => {
+       await syncSingleTable('color_house_checkins');
     })
     .subscribe();
 }
@@ -1926,6 +2046,38 @@ export async function initializeSupabaseSync() {
       }
     }
 
+    // 8. ดึงข้อมูลเช็คชื่อเข้าบ้านสี (Color House Checkins)
+    const { data: dbCheckins, error: checkinsError } = await supabase
+      .from('pink69_color_house_checkins')
+      .select('*')
+      .order('created_at', { ascending: false });
+      
+    if (!checkinsError) {
+      if (dbCheckins && dbCheckins.length > 0) {
+        const parsedCheckins = dbCheckins.map((c: any) => ({
+          id: c.id,
+          submitterId: c.submitter_id,
+          submitterName: c.submitter_name,
+          date: c.date,
+          weekKey: c.week_key,
+          photos: c.photos || [],
+          taggedStudentIds: c.tagged_student_ids || [],
+          taggedStudentNames: c.tagged_student_names || [],
+          status: c.status,
+          approvedBy: c.approved_by || undefined,
+          approvedAt: c.approved_at || undefined,
+          note: c.note || undefined
+        }));
+        safeSetItem('pink69_color_house_checkins', JSON.stringify(parsedCheckins));
+      } else {
+        const localRaw = safeGetItem('pink69_color_house_checkins');
+        const localCheckins = safeJsonParse(localRaw, []);
+        if (localCheckins.length > 0) {
+          await uploadColorHouseCheckinsToSupabase(localCheckins);
+        }
+      }
+    }
+
     isSupabaseLoaded = true;
     isSupabaseConnectedActual = true;
     console.log('[Supabase Sync] Sync initialized successfully.');
@@ -1946,19 +2098,5 @@ export function updateStudentContact(studentId: string, contact: string) {
     s.id === studentId ? { ...s, contact } : s
   );
   
-  const targetStudent = nextStudents.find(s => s.id === studentId);
-  const updatedLogs = [
-    {
-      id: 'log_' + Date.now(),
-      timestamp: new Date().toISOString(),
-      actorId: studentId,
-      actorName: targetStudent ? targetStudent.fullname : 'สมาชิก',
-      actorRole: 'สมาชิก',
-      action: `อัปเดตช่องทางการติดต่อ: "${contact}"`,
-      targetName: undefined
-    },
-    ...current.logs
-  ];
-
-  saveAll(nextStudents, current.sports, current.announcements, updatedLogs);
+  saveAll(nextStudents, current.sports, current.announcements, current.logs);
 }

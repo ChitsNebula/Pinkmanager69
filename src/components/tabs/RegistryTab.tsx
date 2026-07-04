@@ -13,6 +13,17 @@ interface RegistryTabProps {
   isModerator: boolean;
 }
 
+const parseClassroom = (cls: string) => {
+  const match = cls.match(/ม\.(\d+)\/(\d+)/);
+  if (match) {
+    return {
+      grade: parseInt(match[1], 10),
+      room: parseInt(match[2], 10)
+    };
+  }
+  return { grade: 999, room: 999 };
+};
+
 export function RegistryTab({
   data,
   currentUser,
@@ -54,7 +65,12 @@ export function RegistryTab({
     data.students.forEach((s: Student) => {
       if (s.classroom) set.add(s.classroom);
     });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'th'));
+    return Array.from(set).sort((a, b) => {
+      const classA = parseClassroom(a);
+      const classB = parseClassroom(b);
+      if (classA.grade !== classB.grade) return classA.grade - classB.grade;
+      return classA.room - classB.room;
+    });
   }, [data.students]);
 
   const dutyOptions = useMemo(() => {
@@ -142,6 +158,14 @@ export function RegistryTab({
       }
 
       return matchesText && matchesClassroom && matchesTab && matchesCategory && matchesDuty;
+    }).sort((a, b) => {
+      const classA = parseClassroom(a.classroom || '');
+      const classB = parseClassroom(b.classroom || '');
+      if (classA.grade !== classB.grade) return classA.grade - classB.grade;
+      if (classA.room !== classB.room) return classA.room - classB.room;
+      const numA = parseInt(a.number, 10) || 0;
+      const numB = parseInt(b.number, 10) || 0;
+      return numA - numB;
     });
   }, [data.students, registryClassroom, registryDuty, registrySearch, registryTab, registryCategoryFilter]);
 
@@ -1513,7 +1537,16 @@ export function RegistryTab({
                 onClick={() => {
                   setIsExporting(true);
                   setTimeout(() => {
-                    const exportData = data.students.map((s: Student) => ({
+                    const sortedStudents = [...data.students].sort((a, b) => {
+                      const classA = parseClassroom(a.classroom || '');
+                      const classB = parseClassroom(b.classroom || '');
+                      if (classA.grade !== classB.grade) return classA.grade - classB.grade;
+                      if (classA.room !== classB.room) return classA.room - classB.room;
+                      const numA = parseInt(a.number, 10) || 0;
+                      const numB = parseInt(b.number, 10) || 0;
+                      return numA - numB;
+                    });
+                    const exportData = sortedStudents.map((s: Student) => ({
                       id: s.id,
                       fullname: s.fullname,
                       classroom: s.classroom,
@@ -1565,7 +1598,16 @@ export function RegistryTab({
                       none: '-',
                     };
                     const headers = ['รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ชื่อเล่น', 'ห้องเรียน', 'เลขที่', 'สแตนด์เชียร์', 'นักกีฬา', 'ขบวนพาเหรด', 'หน้าที่พิเศษ', 'หน้าที่ทั้งหมด', 'ที่นั่งแสตน'];
-                    const rows = data.students.map((s: Student) => {
+                    const sortedStudents = [...data.students].sort((a, b) => {
+                      const classA = parseClassroom(a.classroom || '');
+                      const classB = parseClassroom(b.classroom || '');
+                      if (classA.grade !== classB.grade) return classA.grade - classB.grade;
+                      if (classA.room !== classB.room) return classA.room - classB.room;
+                      const numA = parseInt(a.number, 10) || 0;
+                      const numB = parseInt(b.number, 10) || 0;
+                      return numA - numB;
+                    });
+                    const rows = sortedStudents.map((s: Student) => {
                       const nicknameMatch = s.fullname.match(/\(\s*([^)]+?)\s*\)\s*$/);
                       const nickname = nicknameMatch ? nicknameMatch[1] : '';
                       const realName = s.fullname.replace(/\s*\([^)]+\)\s*$/, '').trim();
@@ -1629,7 +1671,16 @@ export function RegistryTab({
                 onClick={() => {
                   setIsExporting(true);
                   setTimeout(() => {
-                    const exportData = data.students.map((s: Student) => ({
+                    const sortedStudents = [...data.students].sort((a, b) => {
+                      const classA = parseClassroom(a.classroom || '');
+                      const classB = parseClassroom(b.classroom || '');
+                      if (classA.grade !== classB.grade) return classA.grade - classB.grade;
+                      if (classA.room !== classB.room) return classA.room - classB.room;
+                      const numA = parseInt(a.number, 10) || 0;
+                      const numB = parseInt(b.number, 10) || 0;
+                      return numA - numB;
+                    });
+                    const exportData = sortedStudents.map((s: Student) => ({
                       id: s.id,
                       fullname: s.fullname,
                       classroom: s.classroom,

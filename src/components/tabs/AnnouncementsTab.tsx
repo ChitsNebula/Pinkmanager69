@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Image as ImageIcon } from 'lucide-react';
+import { Image as ImageIcon, Trash2 } from 'lucide-react';
 import { Announcement } from '../../app/store';
 import { Panel } from '../ui';
 import { fileToDataUrl } from '../../lib/helpers';
@@ -16,6 +16,7 @@ interface AnnouncementsTabProps {
   newAnnouncementImage: string;
   setNewAnnouncementImage: (val: string) => void;
   addAnnouncement: (e: React.FormEvent) => void;
+  onDeleteAnnouncement: (id: string) => void;
 }
 
 export function AnnouncementsTab({
@@ -28,6 +29,7 @@ export function AnnouncementsTab({
   newAnnouncementImage,
   setNewAnnouncementImage,
   addAnnouncement,
+  onDeleteAnnouncement,
 }: AnnouncementsTabProps) {
   return (
     <section className="space-y-6">
@@ -107,7 +109,19 @@ export function AnnouncementsTab({
             <div className="p-5">
               <div className="flex items-center justify-between gap-3 mb-2">
                 <h3 className="font-bold text-lg text-text-primary">{item.title}</h3>
-                <span className="text-[11px] text-text-tertiary">{item.date}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] text-text-tertiary">{item.date}</span>
+                  {isController && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteAnnouncement(item.id)}
+                      className="text-red-400 hover:text-red-500 hover:bg-red-500/10 p-1.5 rounded-lg transition-all cursor-pointer hover:scale-105 active:scale-95 flex items-center justify-center"
+                      title="ลบประกาศนี้"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
+                </div>
               </div>
               <p className="text-sm text-text-secondary whitespace-pre-wrap">{item.content}</p>
               <p className="text-xs text-pink-primary mt-3">โดย {item.createdBy}</p>

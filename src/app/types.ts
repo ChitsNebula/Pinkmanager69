@@ -10,7 +10,8 @@ export type Tab =
   | 'choreo'
   | 'admin'
   | 'reports'
-  | 'athlete_events';
+  | 'athlete_events'
+  | 'colorhouse';
 
 // ─── Arm Pose ─────────────────────────────────────────────────────────────────
 export interface ArmPose {
