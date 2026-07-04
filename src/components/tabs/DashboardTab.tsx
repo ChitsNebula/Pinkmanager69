@@ -96,7 +96,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ data, currentUser })
                   <Award size={20} />
                 </div>
                 <div>
-                  <p className="text-xs text-text-secondary font-medium">จองสแตนแล้ว</p>
+                  <p className="text-xs text-text-secondary font-medium">มีที่นั่งในแสตนแล้ว</p>
                   <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400 mt-0.5">{seatedStudents.length} / 180 คน</p>
                 </div>
               </div>
