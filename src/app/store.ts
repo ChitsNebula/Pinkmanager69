@@ -2066,36 +2066,7 @@ export async function initializeSupabaseSync() {
     // เริ่ม Real-time Subscriptions
     setupRealtimeSubscriptions();
 
-    // Backup background polling: เผื่อกรณีที่ระบบ Realtime ของ Supabase ไม่ทำงาน หรือไม่ได้เปิดใช้งาน Replication
-    if (typeof window !== 'undefined') {
-      console.log('[Supabase Sync] Starting optimized backup background polling...');
-      
-      const runIfVisible = (fn: () => void) => {
-        if (document.visibilityState === 'visible') {
-          fn();
-        }
-      };
 
-      // ดึงข้อมูลนักเรียนทุก 12 วินาที (เฉพาะเวลาเปิดจออยู่)
-      setInterval(() => runIfVisible(() => syncSingleTable('students').catch(() => {})), 12000);
-      
-      // ดึง log ทุก 16 วินาที
-      setInterval(() => runIfVisible(() => syncSingleTable('logs').catch(() => {})), 16000);
-      
-      // ดึงข้อมูลกีฬาทุก 24 วินาที
-      setInterval(() => runIfVisible(() => syncSingleTable('sports').catch(() => {})), 24000);
-      
-      // ดึงตารางอื่นทุก 40 วินาที
-      setInterval(() => {
-        runIfVisible(() => {
-          syncSingleTable('reports').catch(() => {});
-          syncSingleTable('color_house_checkins').catch(() => {});
-          syncSingleTable('announcements').catch(() => {});
-          syncSingleTable('config').catch(() => {});
-          syncSingleTable('songs').catch(() => {});
-        });
-      }, 40000);
-    }
 
   } catch (err) {
     isSupabaseConnectedActual = false;
