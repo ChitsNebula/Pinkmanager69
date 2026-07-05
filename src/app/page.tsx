@@ -49,6 +49,7 @@ import {
   initializeSupabaseSync,
   getSupabaseConnectionStatus,
   updateStudentContact,
+  getIsSupabaseLoaded,
 } from './store';
 import { Duty, SportsEvent, Student } from './mockData';
 import { Tab, ArmPoseEquipment, ArmPose, SubSegment } from './types';
@@ -1226,6 +1227,89 @@ export default function Home() {
     const nextReports = data.reports.filter((r: SystemReport) => r.id !== reportId);
     saveSystemReports(nextReports);
   };
+
+  // แสดง Loading Screen / Skeleton ขณะรอโหลดข้อมูล Supabase ครั้งแรก
+  if (mounted && !getIsSupabaseLoaded()) {
+    return (
+      <div className="min-h-screen bg-carbon-dark flex flex-col items-center justify-center p-4 font-sans select-none overflow-hidden relative">
+        <style>{`
+          @keyframes loading {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(200%); }
+          }
+          .animate-loading-bar {
+            animation: loading 1.5s infinite linear;
+          }
+        `}</style>
+        {/* Top Glow bar */}
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-pink-primary via-pink-accent to-pink-primary" />
+
+        <div className="flex flex-col items-center text-center space-y-6 max-w-md w-full relative z-10">
+          {/* Logo Group */}
+          <div className="relative">
+            <div className="w-16 h-16 rounded-full bg-pink-primary flex items-center justify-center font-bold text-white text-3xl tracking-wider shadow-lg shadow-pink-primary/45 animate-bounce">
+              P
+            </div>
+            {/* Pulsing ring around logo */}
+            <div className="absolute -inset-2 rounded-full border-2 border-pink-primary/30 animate-ping opacity-75" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold text-white tracking-widest uppercase">PINK<span className="text-pink-primary">69</span></h2>
+            <p className="text-xs text-text-secondary tracking-wide">กำลังเชื่อมต่อและดึงข้อมูลจาก Supabase...</p>
+          </div>
+
+          {/* Glowing Progress bar */}
+          <div className="w-48 h-1.5 bg-carbon-card rounded-full overflow-hidden border border-pink-primary/10 relative shadow-inner">
+            <div className="absolute top-0 left-0 h-full w-1/3 bg-gradient-to-r from-pink-primary to-pink-accent rounded-full animate-loading-bar" />
+          </div>
+
+          {/* Skeleton Layout Simulation */}
+          <div className="w-full bg-carbon-card/50 border border-pink-primary/5 rounded-[24px] p-6 space-y-4 shadow-xl backdrop-blur-md animate-pulse mt-4">
+            {/* Header skeleton */}
+            <div className="flex justify-between items-center pb-3 border-b border-pink-primary/5">
+              <div className="h-4 bg-carbon-light rounded-md w-28" />
+              <div className="h-4 bg-carbon-light rounded-md w-12" />
+            </div>
+            
+            {/* Stats skeleton */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="h-14 bg-carbon-light/60 rounded-xl p-2 flex flex-col justify-between">
+                <div className="h-2.5 bg-carbon-light/80 rounded w-1/2" />
+                <div className="h-5 bg-carbon-light/80 rounded w-3/4" />
+              </div>
+              <div className="h-14 bg-carbon-light/60 rounded-xl p-2 flex flex-col justify-between">
+                <div className="h-2.5 bg-carbon-light/80 rounded w-2/3" />
+                <div className="h-5 bg-carbon-light/80 rounded w-1/2" />
+              </div>
+              <div className="h-14 bg-carbon-light/60 rounded-xl p-2 flex flex-col justify-between">
+                <div className="h-2.5 bg-carbon-light/80 rounded w-1/3" />
+                <div className="h-5 bg-carbon-light/80 rounded w-3/5" />
+              </div>
+            </div>
+
+            {/* List items skeleton */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center gap-3 bg-carbon-light/40 p-3 rounded-xl">
+                <div className="w-8 h-8 rounded-full bg-carbon-light/60" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 bg-carbon-light/70 rounded w-1/3" />
+                  <div className="h-2 bg-carbon-light/50 rounded w-1/2" />
+                </div>
+              </div>
+              <div className="flex items-center gap-3 bg-carbon-light/40 p-3 rounded-xl">
+                <div className="w-8 h-8 rounded-full bg-carbon-light/60" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 bg-carbon-light/70 rounded w-1/4" />
+                  <div className="h-2 bg-carbon-light/50 rounded w-2/3" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return (

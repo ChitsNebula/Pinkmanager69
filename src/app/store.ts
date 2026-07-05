@@ -1312,6 +1312,10 @@ export function getSupabaseConnectionStatus(): boolean {
   return isSupabaseConnectedActual;
 }
 
+export function getIsSupabaseLoaded(): boolean {
+  return isSupabaseLoaded;
+}
+
 // 1. Helper สำหรับการอัปโหลดนักเรียนขึ้น Supabase (Batching)
 export async function uploadStudentsToSupabase(students: Student[]) {
   if (!supabase) return;
@@ -2078,6 +2082,7 @@ export async function initializeSupabaseSync() {
 
 
   } catch (err) {
+    isSupabaseLoaded = true;
     isSupabaseConnectedActual = false;
     notify();
   }
