@@ -712,9 +712,12 @@ export default function Home() {
     }
   }, [classrooms, loginClassroom, guestReportClassroom]);
 
-  const isSuperController = !!currentUser && (data.controllers.includes(currentUser.id) || currentUser.role === 'staff_m5');
-  const isModerator = !!currentUser && ((data.moderators || []).includes(currentUser.id) || currentUser.role === 'moderator');
-  const isController = isSuperController || isModerator || (!!currentUser && currentUser.role === 'admin_president');
+  // isController ตรวจสอบจาก data.controllers/moderators เท่านั้น
+  // ห้ามเช็ค role field โดยตรง มิฉะนั้นสมาชิกที่ login ผ่านช่องสมาชิก
+  // จะได้สิทธิ์ admin โดยอัตโนมัติแค่มี role === 'staff_m5' ในฐานข้อมูล
+  const isSuperController = !!currentUser && data.controllers.includes(currentUser.id);
+  const isModerator = !!currentUser && (data.moderators || []).includes(currentUser.id);
+  const isController = isSuperController || isModerator;
   const isNormalStudent = !!currentUser && !isController;
 
   useEffect(() => {

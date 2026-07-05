@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { User, LogOut } from 'lucide-react';
 import { Student } from '../../app/mockData';
 import { Tab } from '../../app/types';
@@ -34,6 +34,23 @@ export function Navbar({
     if (match) return match[1];
     return currentUser.fullname.split(' ')[0];
   })();
+
+  // Track whether the tab nav can scroll right (to show fade indicator)
+  const navRef = useRef<HTMLElement>(null);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const check = () => setCanScrollRight(nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 4);
+    check();
+    nav.addEventListener('scroll', check, { passive: true });
+    window.addEventListener('resize', check, { passive: true });
+    return () => {
+      nav.removeEventListener('scroll', check);
+      window.removeEventListener('resize', check);
+    };
+  }, []);
 
   const tabs = (
     [
@@ -118,21 +135,35 @@ export function Navbar({
       </div>
 
       {/* ─── Row 2: Tab Navigation ──────────────────────────────────────── */}
-      <nav className="flex flex-nowrap items-center gap-1 xl:gap-1.5 overflow-x-auto no-scrollbar w-full xl:w-auto pb-0.5 xl:pb-0 scroll-smooth -mx-2 px-2">
-        {tabs.map(([id, label]) => (
-          <button
-            key={id}
-            onClick={() => setCurrentTab(id)}
-            className={`px-3 py-1.5 xl:px-3.5 rounded-full text-xs xl:text-sm font-semibold transition-all whitespace-nowrap cursor-pointer select-none ${
-              currentTab === id
-                ? 'bg-pink-primary text-white'
-                : 'text-text-secondary hover:text-text-primary hover:bg-carbon-light'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
+      <div className="relative w-full xl:w-auto">
+        <nav
+          ref={navRef as React.RefObject<HTMLElement>}
+          className="flex flex-nowrap items-center gap-1 xl:gap-1.5 overflow-x-auto no-scrollbar w-full pb-0.5 xl:pb-0 scroll-smooth -mx-2 px-2"
+        >
+          {tabs.map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setCurrentTab(id)}
+              className={`px-3 py-1.5 xl:px-3.5 rounded-full text-xs xl:text-sm font-semibold transition-all whitespace-nowrap cursor-pointer select-none ${
+                currentTab === id
+                  ? 'bg-pink-primary text-white'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-carbon-light'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+        {/* Scroll fade indicator — shows when there are more tabs to the right */}
+        {canScrollRight && (
+          <div
+            className="pointer-events-none absolute right-0 top-0 h-full w-14 xl:hidden"
+            style={{
+              background: 'linear-gradient(to left, var(--glass-nav-bg) 0%, transparent 100%)',
+            }}
+          />
+        )}
+      </div>
 
       {/* ─── Desktop-only controls (hidden on mobile) ───────────────────── */}
       <div className="hidden xl:flex items-center gap-3 shrink-0">
