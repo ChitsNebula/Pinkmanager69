@@ -256,18 +256,18 @@ export function getStoredData() {
   const announcements = safeJsonParse<Announcement[]>(announcementsRaw, DEFAULT_ANNOUNCEMENTS);
   const logs = safeJsonParse<ActivityLog[]>(logsRaw, DEFAULT_LOGS);
 
-  const defaultControllers = ['39967', '39998', '40059']; // Default controllers including farm (40059)
+  const defaultControllers = ['39967', '39998', '40059', '40092']; // Default controllers
   let controllers = safeJsonParse<string[]>(controllersRaw, defaultControllers);
   let moderators = safeJsonParse<string[]>(moderatorsRaw, []);
 
   // Auto-migration: Ensure default controllers are merged into user's localStorage
   if (typeof window !== 'undefined') {
-    const isControllersMigrated = safeGetItem('pink69_controllers_migrated_v2') === 'true';
+    const isControllersMigrated = safeGetItem('pink69_controllers_migrated_v3') === 'true';
     if (!isControllersMigrated) {
       const merged = Array.from(new Set([...controllers, ...defaultControllers]));
       controllers = merged;
       safeSetItem('pink69_controllers', JSON.stringify(merged));
-      safeSetItem('pink69_controllers_migrated_v2', 'true');
+      safeSetItem('pink69_controllers_migrated_v3', 'true');
     }
   }
 
@@ -1990,7 +1990,7 @@ export async function initializeSupabaseSync() {
         { key: 'procession_qr', value: { qrCode: '', lineLink: '' } },
         { key: 'procession_limit', value: 150 },
         { key: 'procession_title', value: 'ขบวนพาเหรด' },
-        { key: 'controllers', value: ['39967', '39998', '40059'] },
+        { key: 'controllers', value: ['39967', '39998', '40059', '40092'] },
         { key: 'moderators', value: [] },
         { key: 'special_duties', value: DEFAULT_SPECIAL_DUTIES },
         { key: 'staff_passwords', value: {} }
