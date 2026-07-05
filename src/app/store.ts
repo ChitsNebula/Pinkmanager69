@@ -1661,7 +1661,7 @@ export async function syncSingleTable(table: string) {
         safeSetItem('pink69_announcements', JSON.stringify(parsed));
       }
     } else if (table === 'logs') {
-      const { data, error } = await supabase.from('pink69_logs').select('*').order('created_at', { ascending: false }).limit(200);
+      const { data, error } = await supabase.from('pink69_logs').select('*').order('timestamp', { ascending: false }).limit(200);
       if (!error && data) {
         const parsed = data.map((s: any) => ({
           id: s.id,
@@ -1914,7 +1914,7 @@ export async function initializeSupabaseSync() {
     const { data: dbLogs, error: logsError } = await supabase
       .from('pink69_logs')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('timestamp', { ascending: false })
       .limit(200);
       
     if (!logsError) {
