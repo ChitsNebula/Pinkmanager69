@@ -811,6 +811,14 @@ export default function Home() {
       setLoginError('ไม่พบข้อมูลนักเรียน กรุณาตรวจสอบห้อง เลขที่ และรหัสประจำตัว');
       return;
     }
+
+    // 🔒 ระบบความปลอดภัยหลัก: บล็อกไม่ให้ล็อกอินด้วยไอดีผู้ควบคุม/ผู้ดูแลระบบ ผ่านทางช่องล็อกอินสมาชิกเด็ดขาด
+    const isAllowedStaff = data.controllers.includes(student.id) || (data.moderators || []).includes(student.id);
+    if (isAllowedStaff) {
+      setLoginError('รหัสนักเรียนนี้มีสิทธิ์ระดับผู้ควบคุม กรุณาเข้าสู่ระบบผ่านแท็บ "ผู้ควบคุม" ด้วยรหัสผ่านเพื่อความปลอดภัย');
+      return;
+    }
+
     setCurrentUserId(student.id);
     setCurrentTab('dashboard');
   };
