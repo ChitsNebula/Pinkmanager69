@@ -237,31 +237,27 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
   const handleExportSeatsToCSV = () => {
     const rows: string[][] = [];
-    const headers = ['ที่นั่ง', 'รหัสประจำตัว', 'ชื่อ-นามสกุล', 'ชั้นเรียน', 'เลขที่'];
+    
+    // หัวตารางคอลัมน์: แถว, 1, 2, ..., 20
+    const headers = ['แถว'];
+    for (let col = 1; col <= 20; col++) {
+      headers.push(String(col));
+    }
 
+    // ไล่แถวจากบนลงล่าง (I ลงไปหา A)
     const rowLabels = ['I', 'H', 'G', 'F', 'E', 'D', 'C', 'B', 'A'];
     rowLabels.forEach(row => {
+      const rowData = [row]; // คอลัมน์แรกเป็นชื่อแถว (I, H, G...)
       for (let col = 1; col <= 20; col++) {
         const seatLabel = `${row}${col}`;
         const owner = getSeatOwner(seatLabel);
         if (owner) {
-          rows.push([
-            seatLabel,
-            owner.id,
-            owner.fullname,
-            owner.classroom || '',
-            owner.number ? String(owner.number) : ''
-          ]);
+          rowData.push(`${owner.fullname} (${owner.classroom || ''})`);
         } else {
-          rows.push([
-            seatLabel,
-            '',
-            'ว่าง',
-            '',
-            ''
-          ]);
+          rowData.push('ว่าง');
         }
       }
+      rows.push(rowData);
     });
 
     const csvContent = "\uFEFF" + [
@@ -273,7 +269,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `pink69_stand_seats_${Date.now()}.csv`);
+    link.setAttribute('download', `pink69_stand_seating_grid_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
