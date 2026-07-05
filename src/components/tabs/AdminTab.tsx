@@ -1,7 +1,7 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, X, Image as ImageIcon, Settings, Trash2, User } from 'lucide-react';
 import { Student, SportsEvent } from '../../app/mockData';
-import { SpecialDuty, ActivityLog, getStoredData, saveSystemConfig } from '../../app/store';
+import { SpecialDuty, ActivityLog, getStoredData, saveSystemConfig, syncSingleTable } from '../../app/store';
 import { Panel } from '../ui';
 import { SeatGrid } from '../ui/SeatGrid';
 import { fileToDataUrl } from '../../lib/helpers';
@@ -69,11 +69,27 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [newEventGender, setNewEventGender] = useState('ชาย'); // ชาย, หญิง, ผสม
   const [newEventLimit, setNewEventLimit] = useState('1'); // จำนวนคน
 
-  // Local input states for Roles
+  // Local input states for Roles (kept for future use)
   const [newControllerId, setNewControllerId] = useState('');
   const [newModeratorId, setNewModeratorId] = useState('');
   const [rolesError, setRolesError] = useState('');
   const [rolesSuccess, setRolesSuccess] = useState('');
+
+  // Log refresh state
+  const [logRefreshing, setLogRefreshing] = useState(false);
+  const [logLastUpdated, setLogLastUpdated] = useState<Date | null>(null);
+
+  // Auto-refresh logs every 15s when log sub-tab is active
+  useEffect(() => {
+    if (adminSubTab !== 'logs') return;
+    const doRefresh = async () => {
+      await syncSingleTable('logs');
+      setLogLastUpdated(new Date());
+    };
+    doRefresh();
+    const interval = setInterval(doRefresh, 15000);
+    return () => clearInterval(interval);
+  }, [adminSubTab]);
 
   // Sync data updates to local input states
   useEffect(() => {
@@ -558,13 +574,34 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       {adminSubTab === 'logs' && (
         <Panel title="📝 ประวัติการบันทึกข้อมูลการทำงาน (Log History)">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-pink-primary/10">
-            <span className="text-xs text-text-secondary">ประวัติกิจกรรมและการบันทึกข้อมูลทั้งหมดในระบบ</span>
-            <button
-              onClick={handleExportLogsToCSV}
-              className="bg-green-600 hover:bg-green-500 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition-all shadow-md shadow-green-600/10 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer w-max"
-            >
-              📥 ส่งออก Log เป็น CSV
-            </button>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs text-text-secondary">ประวัติกิจกรรมและการบันทึกข้อมูลทั้งหมดในระบบ</span>
+              {logLastUpdated && (
+                <span className="text-[10px] text-text-tertiary">
+                  อัปเดตล่าสุด: {logLastUpdated.toLocaleTimeString('th-TH', { timeStyle: 'short' })} · รีเฟรชอัตโนมัติทุก 15 วิ
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  setLogRefreshing(true);
+                  await syncSingleTable('logs');
+                  setLogLastUpdated(new Date());
+                  setLogRefreshing(false);
+                }}
+                disabled={logRefreshing}
+                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs px-3 py-2 rounded-xl font-bold transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer w-max"
+              >
+                {logRefreshing ? '⏳ กำลังโหลด...' : '🔄 รีเฟรช'}
+              </button>
+              <button
+                onClick={handleExportLogsToCSV}
+                className="bg-green-600 hover:bg-green-500 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition-all shadow-md shadow-green-600/10 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer w-max"
+              >
+                📥 ส่งออก Log เป็น CSV
+              </button>
+            </div>
           </div>
           <div className="space-y-3 max-h-80 overflow-y-auto pr-1 text-xs sm:text-sm">
             {(() => {
