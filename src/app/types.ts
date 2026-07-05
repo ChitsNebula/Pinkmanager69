@@ -4,7 +4,6 @@
 // ─── Navigation ──────────────────────────────────────────────────────────────
 export type Tab =
   | 'dashboard'
-  | 'apply'
   | 'announcements'
   | 'registry'
   | 'choreo'
