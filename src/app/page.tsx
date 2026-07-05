@@ -1256,7 +1256,7 @@ export default function Home() {
 
           <div className="space-y-2">
             <h2 className="text-xl font-bold text-white tracking-widest uppercase">PINK<span className="text-pink-primary">69</span></h2>
-            <p className="text-xs text-text-secondary tracking-wide">กำลังเชื่อมต่อและดึงข้อมูลจาก Supabase...</p>
+            <p className="text-xs text-text-secondary tracking-wide">Loading...</p>
           </div>
 
           {/* Glowing Progress bar */}
