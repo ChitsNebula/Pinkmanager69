@@ -235,6 +235,50 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setEditDutyQr('');
   };
 
+  const handleExportSeatsToCSV = () => {
+    const rows: string[][] = [];
+    const headers = ['ที่นั่ง', 'รหัสประจำตัว', 'ชื่อ-นามสกุล', 'ชั้นเรียน', 'เลขที่'];
+
+    const rowLabels = ['I', 'H', 'G', 'F', 'E', 'D', 'C', 'B', 'A'];
+    rowLabels.forEach(row => {
+      for (let col = 1; col <= 20; col++) {
+        const seatLabel = `${row}${col}`;
+        const owner = getSeatOwner(seatLabel);
+        if (owner) {
+          rows.push([
+            seatLabel,
+            owner.id,
+            owner.fullname,
+            owner.classroom || '',
+            owner.number ? String(owner.number) : ''
+          ]);
+        } else {
+          rows.push([
+            seatLabel,
+            '',
+            'ว่าง',
+            '',
+            ''
+          ]);
+        }
+      }
+    });
+
+    const csvContent = "\uFEFF" + [
+      headers.join(','),
+      ...rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `pink69_stand_seats_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <section className="space-y-6">
       <div>
@@ -283,22 +327,30 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 หากสั่งล็อก สมาชิกที่มีรายชื่อบนสแตนแล้วจะไม่สามารถกดยกเลิกที่นั่งหรือถอนตัวได้เพื่อป้องกันความวุ่นวาย
               </p>
             </div>
-            {isSuperController && (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => saveSystemConfig({ standOpen: !data.standOpen }, currentUser || undefined, data.standOpen ? 'ปิดรับสมัครสแตน' : 'เปิดรับสมัครสแตน')}
-                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${data.standOpen ? 'bg-red-500/10 hover:bg-red-500 hover:text-white text-red-400 border border-red-500/20' : 'bg-green-500/10 hover:bg-green-500 hover:text-white text-green-400 border border-green-500/20'}`}
-                >
-                  {data.standOpen ? 'ปิดรับสมัครสแตน' : 'เปิดรับสมัครสแตน'}
-                </button>
-                <button
-                  onClick={() => saveSystemConfig({ standLocked: !data.standLocked }, currentUser || undefined, data.standLocked ? 'ปลดล็อกการถอนตัวสแตน' : 'ล็อกการถอนตัวสแตน')}
-                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${data.standLocked ? 'bg-yellow-500 text-black font-bold' : 'bg-carbon-light border border-pink-primary/20 text-white hover:bg-pink-primary/25'}`}
-                >
-                  {data.standLocked ? '🔓 ปลดล็อกที่นั่ง' : '🔒 ล็อกที่นั่งทั้งหมด'}
-                </button>
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={handleExportSeatsToCSV}
+                className="bg-green-600 hover:bg-green-500 text-white text-xs px-3.5 py-2.5 rounded-xl font-bold transition-all shadow-md shadow-green-600/10 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer w-max"
+              >
+                📥 ส่งออกที่นั่งเป็น CSV
+              </button>
+              {isSuperController && (
+                <>
+                  <button
+                    onClick={() => saveSystemConfig({ standOpen: !data.standOpen }, currentUser || undefined, data.standOpen ? 'ปิดรับสมัครสแตน' : 'เปิดรับสมัครสแตน')}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${data.standOpen ? 'bg-red-500/10 hover:bg-red-500 hover:text-white text-red-400 border border-red-500/20' : 'bg-green-500/10 hover:bg-green-500 hover:text-white text-green-400 border border-green-500/20'}`}
+                  >
+                    {data.standOpen ? 'ปิดรับสมัครสแตน' : 'เปิดรับสมัครสแตน'}
+                  </button>
+                  <button
+                    onClick={() => saveSystemConfig({ standLocked: !data.standLocked }, currentUser || undefined, data.standLocked ? 'ปลดล็อกการถอนตัวสแตน' : 'ล็อกการถอนตัวสแตน')}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${data.standLocked ? 'bg-yellow-500 text-black font-bold' : 'bg-carbon-light border border-pink-primary/20 text-white hover:bg-pink-primary/25'}`}
+                  >
+                    {data.standLocked ? '🔓 ปลดล็อกที่นั่ง' : '🔒 ล็อกที่นั่งทั้งหมด'}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
           <div className="mt-5 border-t border-pink-primary/10 pt-4">
             <SeatGrid currentUser={currentUser || { id: 'dummy', fullname: 'ระบบ', classroom: 'ม.5', role: 'student_m5', assigned_duty: 'none', duty_status: 'none' }} isController={isSuperController} getSeatOwner={getSeatOwner} onSeatClick={handleSeatClick} />
