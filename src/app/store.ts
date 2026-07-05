@@ -1739,54 +1739,69 @@ export async function syncSingleTable(table: string) {
 }
 
 // 6. ตั้งค่า Real-time Subscriptions ฟังการเปลี่ยนแปลงและอัปเดต React
+const syncDebounceTimers = new Map<string, any>();
+
+export function triggerDebouncedSync(table: string, delay = 800) {
+  if (typeof window === 'undefined') return;
+  const existing = syncDebounceTimers.get(table);
+  if (existing) {
+    clearTimeout(existing);
+  }
+  const timer = setTimeout(() => {
+    syncSingleTable(table).catch(console.error);
+    syncDebounceTimers.delete(table);
+  }, delay);
+  syncDebounceTimers.set(table, timer);
+}
+
 function setupRealtimeSubscriptions() {
   if (!supabase) return;
 
   supabase.channel('public:pink69_students')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_students' }, async () => {
-       await syncSingleTable('students');
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_students' }, () => {
+       triggerDebouncedSync('students');
     })
     .subscribe();
 
   supabase.channel('public:pink69_announcements')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_announcements' }, async () => {
-       await syncSingleTable('announcements');
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_announcements' }, () => {
+       triggerDebouncedSync('announcements');
     })
     .subscribe();
 
   supabase.channel('public:pink69_sports')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_sports' }, async () => {
-       await syncSingleTable('sports');
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_sports' }, () => {
+       triggerDebouncedSync('sports');
     })
     .subscribe();
 
   supabase.channel('public:pink69_logs')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_logs' }, async () => {
-       await syncSingleTable('logs');
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_logs' }, () => {
+       triggerDebouncedSync('logs');
     })
     .subscribe();
 
   supabase.channel('public:pink69_config')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_config' }, async () => {
-       await syncSingleTable('config');
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_config' }, () => {
+       triggerDebouncedSync('config');
     })
     .subscribe();
 
   supabase.channel('public:pink69_songs')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_songs' }, async () => {
-       await syncSingleTable('songs');
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_songs' }, () => {
+       triggerDebouncedSync('songs');
     })
     .subscribe();
 
   supabase.channel('public:pink69_reports')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_reports' }, async () => {
-       await syncSingleTable('reports');
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_reports' }, () => {
+       triggerDebouncedSync('reports');
     })
     .subscribe();
 
   supabase.channel('public:pink69_color_house_checkins')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_color_house_checkins' }, async () => {
-       await syncSingleTable('color_house_checkins');
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'pink69_color_house_checkins' }, () => {
+       triggerDebouncedSync('color_house_checkins');
     })
     .subscribe();
 }
