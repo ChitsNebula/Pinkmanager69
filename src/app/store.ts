@@ -932,27 +932,7 @@ export function deleteStudent(studentId: string, actor?: Student) {
   const target = students.find((s: Student) => s.id === studentId);
   let nextStudents = students.filter((s: Student) => s.id !== studentId);
 
-  // จัดเลขที่ใหม่สำหรับห้องที่โดนลบสมาชิกออกไป เพื่อไม่ให้เลขที่แหว่งในอนาคต
-  if (target && target.classroom) {
-    const classroom = target.classroom;
-    const classStudents = nextStudents.filter((s: Student) => s.classroom === classroom);
-    const otherStudents = nextStudents.filter((s: Student) => s.classroom !== classroom);
 
-    // เรียงตามเลขที่เดิม
-    classStudents.sort((a: Student, b: Student) => {
-      const numA = parseInt(a.number, 10) || 999;
-      const numB = parseInt(b.number, 10) || 999;
-      return numA - numB;
-    });
-
-    // รันเลขที่ใหม่ 1, 2, 3...
-    const updatedClassStudents = classStudents.map((s: Student, idx: number) => ({
-      ...s,
-      number: String(idx + 1)
-    }));
-
-    nextStudents = [...otherStudents, ...updatedClassStudents];
-  }
 
   let updatedLogs = logs;
   if (actor && target) {
