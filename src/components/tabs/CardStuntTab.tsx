@@ -38,6 +38,12 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1500); // ms per word
   const [dragColor, setDragColor] = useState<string>('ชมพู');
   const [isMouseDown, setIsMouseDown] = useState<boolean>(false);
+  const isMouseDownRef = useRef(isMouseDown);
+  const gridContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    isMouseDownRef.current = isMouseDown;
+  }, [isMouseDown]);
 
   const activeSegRef = useRef(activeSegmentIndex);
   const activeWordRef = useRef(activeWordIndex);
@@ -182,6 +188,69 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
     });
     saveSongs(nextSongs); // Silently save visuals for smooth drawing performance
   };
+
+  // Touch device drawing logic with passive: false to prevent scrolling
+  useEffect(() => {
+    const grid = gridContainerRef.current;
+    if (!grid) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      const targetEl = e.target as HTMLElement;
+      const seatEl = targetEl.closest('[data-seat-label]');
+      if (seatEl) {
+        // Prevent default browser scrolling when drawing
+        e.preventDefault();
+        const seatLabel = seatEl.getAttribute('data-seat-label');
+        if (seatLabel) {
+          setIsMouseDown(true);
+          handleUpdateSeatVisual(selectedSongId, activeSegmentIndex, activeWordIndex, seatLabel, dragColor);
+        }
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isMouseDownRef.current) return;
+      // Prevent browser default scroll behaviors
+      e.preventDefault();
+
+      const touch = e.touches[0];
+      const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+      if (!targetEl) return;
+
+      const seatEl = targetEl.closest('[data-seat-label]');
+      if (seatEl) {
+        const seatLabel = seatEl.getAttribute('data-seat-label');
+        if (seatLabel) {
+          handleUpdateSeatVisual(selectedSongId, activeSegmentIndex, activeWordIndex, seatLabel, dragColor);
+        }
+      }
+    };
+
+    const handleTouchEnd = () => {
+      setIsMouseDown(false);
+    };
+
+    grid.addEventListener('touchstart', handleTouchStart, { passive: false });
+    grid.addEventListener('touchmove', handleTouchMove, { passive: false });
+    grid.addEventListener('touchend', handleTouchEnd);
+    grid.addEventListener('touchcancel', handleTouchEnd);
+
+    // Global listeners to clean up isMouseDown state
+    const handleGlobalMouseUp = () => {
+      setIsMouseDown(false);
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    window.addEventListener('touchend', handleGlobalMouseUp);
+
+    return () => {
+      grid.removeEventListener('touchstart', handleTouchStart);
+      grid.removeEventListener('touchmove', handleTouchMove);
+      grid.removeEventListener('touchend', handleTouchEnd);
+      grid.removeEventListener('touchcancel', handleTouchEnd);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+      window.removeEventListener('touchend', handleGlobalMouseUp);
+    };
+  }, [selectedSongId, activeSegmentIndex, activeWordIndex, dragColor]);
 
   const handleBulkUpdateVisuals = (songId: string, segmentIndex: number, wordIndex: number, mode: 'fill' | 'clear', value?: string) => {
     if (!currentUser || !isController) return;
@@ -1609,7 +1678,10 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
                           {/* Visual 180 Seating Grid */}
                           <div className="flex flex-col items-center">
                             <div className="w-full bg-carbon-dark border border-pink-primary/10 p-4 rounded-2xl overflow-auto select-none font-bold">
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(21, minmax(28px, 1fr))', gap: '4px', justifyContent: 'center' }}>
+                              <div 
+                                ref={gridContainerRef}
+                                style={{ display: 'grid', gridTemplateColumns: 'repeat(21, minmax(28px, 1fr))', gap: '4px', justifyContent: 'center', touchAction: 'none' }}
+                              >
                                 {/* Empty top-left header */}
                                 <div className="w-full aspect-square" />
                                 {columns.map(col => (
@@ -1631,6 +1703,7 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
                                       return (
                                         <div
                                           key={seatLabel}
+                                          data-seat-label={seatLabel}
                                           onMouseDown={(e) => {
                                             e.preventDefault();
                                             setIsMouseDown(true);
