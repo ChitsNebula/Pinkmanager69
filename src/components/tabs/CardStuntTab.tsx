@@ -154,10 +154,14 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
 
   const handleUpdateSeatVisual = (songId: string, segmentIndex: number, wordIndex: number, seatLabel: string, value: string) => {
     if (!currentUser || !isController) return;
-    const song = data.songs.find((s: Song) => s.id === songId);
+    
+    // Read the fresh current songs directly from the store instead of the stale data.songs props
+    const freshSongs = getStoredData().songs;
+    const song = freshSongs.find((s: Song) => s.id === songId);
     if (song?.isLocked) return;
     const targetValue = value === '' ? 'none' : value;
-    const nextSongs = data.songs.map((song: Song) => {
+    
+    const nextSongs = freshSongs.map((song: Song) => {
       if (song.id === songId) {
         const nextSegments = song.segments.map((seg, idx) => {
           if (idx === segmentIndex) {
