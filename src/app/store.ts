@@ -561,9 +561,27 @@ function saveAll(
   }
 }
 
+function debounce<T extends (...args: any[]) => void>(func: T, wait: number): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout | null = null;
+  return (...args: Parameters<T>) => {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(() => {
+      func(...args);
+    }, wait);
+  };
+}
+
+let lastLocalSongUpdate = 0;
+
+const debouncedUploadSongs = debounce(async (songs: Song[]) => {
+  console.log('[Supabase Sync] Uploading songs to Supabase (debounced)...');
+  await uploadSongsToSupabase(songs);
+}, 600);
+
 export function saveSongs(songs: Song[], actor?: Student, action?: string) {
   if (typeof window === 'undefined') return;
   safeSetItem('pink69_songs', JSON.stringify(songs));
+  lastLocalSongUpdate = Date.now(); // บันทึกเวลาที่มีการอัปเดตล่าสุด
   
   let updatedLogs: ActivityLog[] | null = null;
   if (actor && action) {
@@ -584,9 +602,7 @@ export function saveSongs(songs: Song[], actor?: Student, action?: string) {
   notify();
 
   if (supabase) {
-    uploadSongsToSupabase(songs).catch(err => {
-      console.error('[Supabase Sync] Error uploading songs in saveSongs:', err);
-    });
+    debouncedUploadSongs(songs); // อัปโหลดแบบหน่วงเวลาเพื่อป้องกัน Race Condition
     if (updatedLogs) {
       uploadLogsToSupabase(updatedLogs).catch(err => {
         console.error('[Supabase Sync] Error uploading logs in saveSongs:', err);
@@ -625,12 +641,11 @@ export function toggleSongLock(songId: string, actor?: Student): void {
       return s;
     });
     safeSetItem('pink69_songs', JSON.stringify(updatedSongs));
+    lastLocalSongUpdate = Date.now(); // บันทึกเวลาที่มีการอัปเดตล่าสุด
     notify();
 
     if (supabase) {
-      uploadSongsToSupabase(updatedSongs).catch(err => {
-        console.error('[Supabase Sync] Error uploading songs in toggleSongLock:', err);
-      });
+      debouncedUploadSongs(updatedSongs); // อัปโหลดแบบหน่วงเวลาเพื่อป้องกัน Race Condition
       if (updatedLogs) {
         uploadLogsToSupabase(updatedLogs).catch(err => {
           console.error('[Supabase Sync] Error uploading logs in toggleSongLock:', err);
@@ -1688,6 +1703,11 @@ export async function syncSingleTable(table: string) {
         });
       }
     } else if (table === 'songs') {
+      // 🔒 ป้องกันการดึงข้อมูลทับข้อมูลฝั่งตรงข้ามขณะที่เรากำลังทำการวาดตารางแปรอักษร (ภายใน 2 วินาทีล่าสุด)
+      if (Date.now() - lastLocalSongUpdate < 2000) {
+        console.log('[Supabase Sync] Skipped songs sync to prevent overwriting active local edits');
+        return;
+      }
       const { data, error } = await supabase.from('pink69_songs').select('*');
       if (!error && data) {
         const parsed = data.map((s: any) => ({
