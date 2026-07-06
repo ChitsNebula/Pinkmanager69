@@ -555,6 +555,10 @@ function saveAll(
   notify();
 
   if (supabase) {
+    if (!isStudentsTableLoaded) {
+      console.warn('[Supabase Sync] Prevented saveAll upload: database is not yet loaded.');
+      return;
+    }
     uploadAllToSupabase(students, sports, announcements, logs).catch(err => {
       console.error('[Supabase Sync] Error during saveAll background upload:', err);
     });
@@ -1322,6 +1326,7 @@ export function importStudentsData(newStudents: Student[], mode: 'merge' | 'repl
 
 let isSupabaseLoaded = false;
 let isSupabaseConnectedActual = false;
+let isStudentsTableLoaded = false;
 
 export function getSupabaseConnectionStatus(): boolean {
   return isSupabaseConnectedActual;
@@ -1654,6 +1659,7 @@ export async function syncSingleTable(table: string) {
           contact: s.contact || undefined
         }));
         safeSetItem('pink69_students', JSON.stringify(parsed));
+        isStudentsTableLoaded = true;
       }
     } else if (table === 'sports') {
       const { data, error } = await supabase.from('pink69_sports').select('*');
@@ -1850,7 +1856,12 @@ export async function initializeSupabaseSync() {
       const localRaw = safeGetItem('pink69_students');
       const localStudents = safeJsonParse(localRaw, INITIAL_STUDENTS);
 
-      if (dbStudents && dbStudents.length > 0) {
+      const localWithDuties = localStudents.filter((s: any) => s.assigned_duty && s.assigned_duty !== 'none').length;
+      const dbWithDuties = dbStudents ? dbStudents.filter((s: any) => s.assigned_duty && s.assigned_duty !== 'none').length : 0;
+
+      console.log(`[Supabase Sync] Student duties check - Local: ${localWithDuties}, DB: ${dbWithDuties}`);
+
+      if (dbStudents && dbStudents.length > 0 && !(dbWithDuties === 0 && localWithDuties > 0)) {
         // เคารพข้อมูลในฐานข้อมูลเสมอเป็น Source of Truth เพื่อไม่ให้เกิดลูปการอัปเดตทับกันข้ามเครื่อง
         console.log('[Supabase Sync] Hydrating students from Supabase to Local...');
         const parsedStudents = dbStudents.map((s: any) => ({
@@ -1868,10 +1879,12 @@ export async function initializeSupabaseSync() {
           contact: s.contact || undefined
         }));
         safeSetItem('pink69_students', JSON.stringify(parsedStudents));
+        isStudentsTableLoaded = true;
       } else {
-        // อัปโหลดข้อมูลขึ้น DB เฉพาะเมื่อฐานข้อมูลว่างเปล่าจริงๆ เท่านั้น
-        console.log('[Supabase Sync] Uploading initial local students to Supabase...');
+        // อัปโหลดข้อมูลขึ้น DB เพื่อความถูกต้องหรือกู้คืนอัตโนมัติ (เช่น กรณี DB ถูกล้างแต่ในเครื่องผู้ใช้ยังมีข้อมูลค้างดีอยู่)
+        console.log('[Supabase Sync] Uploading or recovering local student duties to Supabase...');
         await uploadStudentsToSupabase(localStudents);
+        isStudentsTableLoaded = true;
       }
     }
 
