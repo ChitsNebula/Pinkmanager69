@@ -1983,7 +1983,7 @@ export async function initializeSupabaseSync() {
         { key: 'procession_qr', value: { qrCode: '', lineLink: '' } },
         { key: 'procession_limit', value: 150 },
         { key: 'procession_title', value: 'ขบวนพาเหรด' },
-        { key: 'controllers', value: ['39967', '39998', '40059', '40092'] },
+        { key: 'controllers', value: ['39967', '39998', '40059', '40092', '40049', '40132', '40294'] },
         { key: 'moderators', value: [] },
         { key: 'special_duties', value: DEFAULT_SPECIAL_DUTIES },
         { key: 'staff_passwords', value: {} }
