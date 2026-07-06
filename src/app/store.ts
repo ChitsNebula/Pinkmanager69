@@ -273,7 +273,7 @@ export function getStoredData() {
 
   // Auto-migration: Ensure default controller student profiles are in the students list so they have identities
   if (typeof window !== 'undefined') {
-    const isStudentsControllersMigrated = safeGetItem('pink69_students_controllers_migrated_v4') === 'true';
+    const isStudentsControllersMigrated = safeGetItem('pink69_students_controllers_migrated_v3') === 'true';
     if (!isStudentsControllersMigrated) {
       let nextStudents = [...rawStudents];
       const defaultControllerProfiles: Student[] = [
@@ -294,33 +294,6 @@ export function getStoredData() {
           role: "staff_m5",
           assigned_duty: "none",
           duty_status: "none"
-        },
-        {
-          id: "40049",
-          fullname: "ชยาดา สมบูรณ์ (พร้อม)",
-          classroom: "ม.5/1",
-          number: "10",
-          role: "staff_m5",
-          assigned_duty: "none",
-          duty_status: "none"
-        },
-        {
-          id: "40132",
-          fullname: "ธนิสตา สีอินทร์ (มินิ)",
-          classroom: "ม.5/1",
-          number: "15",
-          role: "staff_m5",
-          assigned_duty: "none",
-          duty_status: "none"
-        },
-        {
-          id: "40294",
-          fullname: "ภรภัทร ไชยยงยศ (ออม)",
-          classroom: "ม.5/1",
-          number: "21",
-          role: "staff_m5",
-          assigned_duty: "none",
-          duty_status: "none"
         }
       ];
 
@@ -336,7 +309,7 @@ export function getStoredData() {
         rawStudents = nextStudents;
         safeSetItem('pink69_students', JSON.stringify(rawStudents));
       }
-      safeSetItem('pink69_students_controllers_migrated_v4', 'true');
+      safeSetItem('pink69_students_controllers_migrated_v3', 'true');
     }
 
     const isNicknamesMigrated = safeGetItem('pink69_m41_nicknames_migrated_v1') === 'true';
