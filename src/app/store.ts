@@ -538,7 +538,7 @@ export function getStoredData() {
     return next;
   });
 
-  return { students, sports, announcements, logs, controllers, moderators, standOpen, standLocked, specialDuties, athleteQr, processionQr, processionLimit, processionTitle, songs, reports, colorHouseCheckins };
+  return { students, sports, announcements, logs, controllers, moderators, standOpen, standLocked, specialDuties, athleteQr, processionQr, processionLimit, processionTitle, songs, reports, colorHouseCheckins, isSavingDatabase: getIsSavingDatabase() };
 }
 
 function saveAll(
@@ -559,7 +559,7 @@ function saveAll(
       console.warn('[Supabase Sync] Prevented saveAll upload: database is not yet loaded.');
       return;
     }
-    uploadAllToSupabase(students, sports, announcements, logs).catch(err => {
+    withDatabaseLock(uploadAllToSupabase(students, sports, announcements, logs)).catch(err => {
       console.error('[Supabase Sync] Error during saveAll background upload:', err);
     });
   }
@@ -579,7 +579,7 @@ let lastLocalSongUpdate = 0;
 
 const debouncedUploadSongs = debounce(async (songs: Song[]) => {
   console.log('[Supabase Sync] Uploading songs to Supabase (debounced)...');
-  await uploadSongsToSupabase(songs);
+  await withDatabaseLock(uploadSongsToSupabase(songs));
 }, 600);
 
 export function saveSongs(songs: Song[], actor?: Student, action?: string) {
@@ -751,7 +751,7 @@ export function saveSystemConfig(config: {
       promises.push(supabase.from('pink69_config').upsert({ key: 'procession_title', value: config.processionTitle }));
     }
     
-    Promise.all(promises).catch(err => {
+    withDatabaseLock(Promise.all(promises)).catch(err => {
       console.error('[Supabase Sync] Error during saveSystemConfig upload:', err);
     });
 
@@ -1327,6 +1327,22 @@ export function importStudentsData(newStudents: Student[], mode: 'merge' | 'repl
 let isSupabaseLoaded = false;
 let isSupabaseConnectedActual = false;
 let isStudentsTableLoaded = false;
+let isSavingDatabase = false;
+
+export function getIsSavingDatabase(): boolean {
+  return isSavingDatabase;
+}
+
+async function withDatabaseLock<T>(promise: Promise<T>): Promise<T> {
+  isSavingDatabase = true;
+  notify();
+  try {
+    return await promise;
+  } finally {
+    isSavingDatabase = false;
+    notify();
+  }
+}
 
 export function getSupabaseConnectionStatus(): boolean {
   return isSupabaseConnectedActual;
@@ -1605,7 +1621,7 @@ export function saveColorHouseCheckins(
   notify();
 
   if (supabase) {
-    uploadColorHouseCheckinsToSupabase(checkins).catch(err => {
+    withDatabaseLock(uploadColorHouseCheckinsToSupabase(checkins)).catch(err => {
       console.error('[Supabase Sync] Error uploading color house checkins:', err);
     });
     if (updatedLogs) {

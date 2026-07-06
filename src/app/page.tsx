@@ -1959,7 +1959,23 @@ export default function Home() {
         {/* editingSpecialDuty modal is now handled locally in AdminTab component */}
       </div>
 
-
+      {/* Centralized database save/upload loading lock overlay */}
+      {data.isSavingDatabase && (
+        <div className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-md flex flex-col items-center justify-center p-4 select-none pointer-events-auto">
+          <div className="flex flex-col items-center space-y-4 bg-carbon-card/90 border border-pink-primary/20 rounded-3xl p-8 shadow-2xl animate-scaleUp max-w-xs text-center">
+            <div className="relative">
+              {/* Outer spinning color track */}
+              <div className="w-12 h-12 rounded-full border-4 border-pink-primary/10 border-t-pink-primary animate-spin" />
+              {/* Central pulsating core */}
+              <div className="absolute inset-3 bg-pink-accent/20 rounded-full animate-ping" />
+            </div>
+            <div className="space-y-1">
+              <p className="font-bold text-white text-sm font-sans">กำลังบันทึกข้อมูล...</p>
+              <p className="text-[10px] text-text-tertiary font-sans">กรุณารอสักครู่ ระบบกำลังอัปโหลดขึ้นเซิร์ฟเวอร์หลักเพื่อความปลอดภัย</p>
+            </div>
+          </div>
+        </div>
+      )}
 
     </main>
   );
