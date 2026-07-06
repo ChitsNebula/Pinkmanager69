@@ -13,7 +13,9 @@ import {
   ThumbsUp,
   Image as ImageIcon,
   Check,
-  AlertCircle
+  AlertCircle,
+  X,
+  RefreshCw
 } from 'lucide-react';
 import { ColorHouseCheckin, getRoleLabel } from '../../app/store';
 import { Student } from '../../app/mockData';
@@ -109,6 +111,94 @@ export function ColorHouseTab({
   const [taggedIds, setTaggedIds] = useState<string[]>([currentUser.id]); // ตั้งต้นแท็กตัวเอง
   const [submitting, setSubmitting] = useState(false);
   const [selectedPreviewImage, setSelectedPreviewImage] = useState<string | null>(null);
+  
+  // Camera States
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraFacingMode, setCameraFacingMode] = useState<'user' | 'environment'>('environment');
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+
+  // Auto-bind stream when video element mounts
+  React.useEffect(() => {
+    if (isCameraOpen && cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+    }
+  }, [isCameraOpen, cameraStream]);
+
+  // Clean up camera stream on unmount
+  React.useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [cameraStream]);
+
+  const startCamera = async (facing: 'user' | 'environment' = 'environment') => {
+    setIsCameraOpen(true);
+    setCameraFacingMode(facing);
+    try {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+      
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: facing,
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      });
+      setCameraStream(stream);
+    } catch (err) {
+      console.error('Error starting camera:', err);
+      alert('ไม่สามารถเข้าถึงกล้องถ่ายรูปได้ครับ กรุณาอนุญาตสิทธิ์การใช้กล้องในเบราว์เซอร์ของคุณก่อนนะครับ');
+      setIsCameraOpen(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    setIsCameraOpen(false);
+  };
+
+  const switchCamera = () => {
+    const nextFacing = cameraFacingMode === 'user' ? 'environment' : 'user';
+    startCamera(nextFacing);
+  };
+
+  const capturePhoto = async () => {
+    if (!videoRef.current || !cameraStream) return;
+    
+    setIsCompressing(true);
+    try {
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        if (cameraFacingMode === 'user') {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        const compressed = await compressImage(dataUrl);
+        setSelectedPhotos(prev => [...prev, compressed]);
+      }
+    } catch (err) {
+      console.error('Failed to capture photo:', err);
+    } finally {
+      setIsCompressing(false);
+      stopCamera();
+    }
+  };
   
   // States สำหรับสตาฟกรอก Note ตอนไม่อนุมัติ
   const [rejectionNoteId, setRejectionNoteId] = useState<string | null>(null);
@@ -397,6 +487,15 @@ export function ColorHouseTab({
                       onChange={handlePhotoUpload} 
                     />
                   </label>
+
+                  <button
+                    type="button"
+                    onClick={() => startCamera('environment')}
+                    className="flex flex-col items-center justify-center w-24 h-24 bg-carbon-dark hover:bg-carbon-light/50 border border-pink-primary/10 rounded-2xl cursor-pointer hover:border-pink-primary/40 transition-all select-none group"
+                  >
+                    <Camera size={24} className="text-text-tertiary group-hover:text-pink-primary transition-colors mb-1" />
+                    <span className="text-[10px] font-bold text-text-tertiary">ถ่ายรูป</span>
+                  </button>
 
                   {/* แสดง Preview รูปแต่ละใบ */}
                   {selectedPhotos.map((photo, index) => (
@@ -833,6 +932,76 @@ export function ColorHouseTab({
               alt="expanded preview" 
               className="max-w-full max-h-[85vh] rounded-3xl object-contain border border-white/10"
             />
+          </div>
+        </div>
+      )}
+
+      {/* Webcam Capture Modal */}
+      {isCameraOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-carbon-card border border-pink-primary/20 rounded-3xl p-5 shadow-2xl relative flex flex-col gap-4 animate-scaleUp">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-pink-primary/10 pb-3">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                📷 ถ่ายรูปรายงานตัวเข้าบ้านสี
+              </h3>
+              <button 
+                onClick={stopCamera}
+                className="text-text-secondary hover:text-white transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Camera Viewfinder */}
+            <div className="relative aspect-video rounded-2xl overflow-hidden bg-black border border-pink-primary/10 flex items-center justify-center">
+              <video 
+                ref={videoRef}
+                autoPlay 
+                playsInline 
+                muted 
+                className="w-full h-full object-cover"
+                style={{ transform: cameraFacingMode === 'user' ? 'scaleX(-1)' : 'none' }}
+              />
+              
+              {/* Overlay guides / scan lines */}
+              <div className="absolute inset-4 border border-dashed border-white/20 rounded-xl pointer-events-none flex items-center justify-center">
+                <span className="text-[10px] text-white/40 font-bold bg-black/40 px-2.5 py-1 rounded-full uppercase tracking-widest">
+                  {cameraFacingMode === 'user' ? 'กล้องหน้า' : 'กล้องหลัง'}
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Controls */}
+            <div className="flex items-center justify-between gap-4 mt-2">
+              <button
+                type="button"
+                onClick={stopCamera}
+                className="flex-1 bg-carbon-dark hover:bg-carbon-light/80 border border-pink-primary/10 text-text-secondary py-3 rounded-xl text-xs font-bold transition-all text-center cursor-pointer active:scale-95"
+              >
+                ยกเลิก
+              </button>
+
+              <button
+                type="button"
+                onClick={capturePhoto}
+                className="w-16 h-16 bg-pink-primary hover:bg-pink-accent border-4 border-white/20 hover:border-white/40 rounded-full flex items-center justify-center text-white transition-all shadow-lg active:scale-90 cursor-pointer"
+                title="กดถ่ายรูป"
+              >
+                <Camera size={26} />
+              </button>
+
+              <button
+                type="button"
+                onClick={switchCamera}
+                className="flex-1 bg-carbon-dark hover:bg-carbon-light/80 border border-pink-primary/10 text-text-secondary py-3 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <RefreshCw size={14} />
+                สลับกล้อง
+              </button>
+            </div>
+
           </div>
         </div>
       )}
