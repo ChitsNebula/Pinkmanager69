@@ -213,6 +213,16 @@ export function RegistryTab({
         return 'นักกีฬา';
       case 'procession':
         return data.processionTitle || 'ขบวนพาเหรด';
+      case 'cheerleader':
+        return 'หลีดเดอร์';
+      case 'drummer':
+        return 'ดรัมเมเยอร์';
+      case 'band':
+        return 'ดุริยางค์ & ดนตรี';
+      case 'drum':
+        return 'กลองสแตนเชียร์';
+      case 'staff':
+        return 'สตาฟ / ผู้ดูแล';
       default:
         return duty;
     }

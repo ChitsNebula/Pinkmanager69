@@ -28,6 +28,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ data, currentUser })
         return 'นักกีฬา';
       case 'procession':
         return data.processionTitle || 'เดินขบวนพาเหรด';
+      case 'cheerleader':
+        return 'หลีดเดอร์';
+      case 'drummer':
+        return 'ดรัมเมเยอร์';
+      case 'band':
+        return 'ดุริยางค์ & ดนตรี';
+      case 'drum':
+        return 'กลองสแตนเชียร์';
       case 'staff':
         return 'พี่คุมงาน / สตาฟ';
       default:
