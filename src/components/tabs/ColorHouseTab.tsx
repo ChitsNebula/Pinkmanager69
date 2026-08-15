@@ -105,7 +105,7 @@ export function ColorHouseTab({
   const currentWeekKey = useMemo(() => getISOWeekKey(), []);
 
   // States
-  const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
+  const [selectedPhotos, setSelectedPhotos] = useState<{compressed: string, original: string}[]>([]);
   const [isCompressing, setIsCompressing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [taggedIds, setTaggedIds] = useState<string[]>([currentUser.id]); // ตั้งต้นแท็กตัวเอง
@@ -188,9 +188,9 @@ export function ColorHouseTab({
           ctx.scale(-1, 1);
         }
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        const dataUrl = canvas.toDataURL('image/jpeg', 1.0); // เก็บคุณภาพเต็ม 100% สำหรับ Drive
         const compressed = await compressImage(dataUrl);
-        setSelectedPhotos(prev => [...prev, compressed]);
+        setSelectedPhotos(prev => [...prev, { compressed, original: dataUrl }]);
       }
     } catch (err) {
       console.error('Failed to capture photo:', err);
@@ -323,13 +323,13 @@ export function ColorHouseTab({
     if (!files || files.length === 0) return;
     
     setIsCompressing(true);
-    const newPhotos: string[] = [];
+    const newPhotos: {compressed: string, original: string}[] = [];
     
     for (let i = 0; i < files.length; i++) {
       try {
         const rawBase64 = await fileToDataUrl(files[i]);
         const compressed = await compressImage(rawBase64);
-        newPhotos.push(compressed);
+        newPhotos.push({ compressed, original: rawBase64 });
       } catch (err) {
         console.error('Failed to process image:', err);
       }
@@ -368,11 +368,40 @@ export function ColorHouseTab({
     
     setSubmitting(true);
     try {
-      await onSubmitCheckin(selectedPhotos, taggedIds);
+      const googleDriveUrl = process.env.NEXT_PUBLIC_GOOGLE_DRIVE_WEBAPP_URL;
+      
+      // อัปโหลดไฟล์เต็มลง Google Drive (ถ้าตั้งค่า URL ไว้)
+      if (googleDriveUrl) {
+         try {
+            const uploadDate = new Date();
+            const dateStr = uploadDate.toLocaleDateString('th-TH', { 
+              year: 'numeric', month: 'long', day: 'numeric' 
+            });
+            
+            await Promise.all(selectedPhotos.map(async (photo, idx) => {
+               await fetch(googleDriveUrl, {
+                  method: 'POST',
+                  body: JSON.stringify({
+                     imageBase64: photo.original,
+                     filename: `Checkin_${currentUser.fullname.replace(/\s+/g, '_')}_${Date.now()}_${idx}.jpg`,
+                     weekKey: currentWeekKey,
+                     dateStr: dateStr
+                  }),
+                  headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                  mode: 'no-cors' // เลี่ยงปัญหา CORS preflight request
+               });
+            }));
+         } catch (driveErr) {
+            console.error('Google Drive Upload Error:', driveErr);
+         }
+      }
+
+      // ส่งรูปแบบบีบอัดไปที่ Supabase
+      await onSubmitCheckin(selectedPhotos.map(p => p.compressed), taggedIds);
       // เคลียร์ฟอร์มสำเร็จ
       setSelectedPhotos([]);
       setTaggedIds([currentUser.id]);
-      alert('ส่งเช็คชื่อเข้าบ้านสีเสร็จสิ้น! รอพี่สตาฟผู้ควบคุมอนุมัติความถูกต้องครับมึง');
+      alert('ส่งเช็คชื่อเข้าบ้านสีเสร็จสิ้น! รออนุมัติ');
     } catch (err) {
       console.error(err);
       alert('เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้ง');
@@ -501,10 +530,10 @@ export function ColorHouseTab({
                   {selectedPhotos.map((photo, index) => (
                     <div key={index} className="relative w-24 h-24 rounded-2xl overflow-hidden border border-pink-primary/10 group">
                       <img 
-                        src={photo} 
+                        src={photo.compressed} 
                         alt="upload preview" 
                         className="w-full h-full object-cover cursor-pointer"
-                        onClick={() => setSelectedPreviewImage(photo)}
+                        onClick={() => setSelectedPreviewImage(photo.compressed)}
                       />
                       <button
                         type="button"

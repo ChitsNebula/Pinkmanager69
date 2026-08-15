@@ -1877,8 +1877,8 @@ export async function initializeSupabaseSync() {
 
       console.log(`[Supabase Sync] Student duties check - Local: ${localWithDuties}, DB: ${dbWithDuties}`);
 
-      if (dbStudents && dbStudents.length > 0 && !(dbWithDuties === 0 && localWithDuties > 0)) {
-        // เคารพข้อมูลในฐานข้อมูลเสมอเป็น Source of Truth เพื่อไม่ให้เกิดลูปการอัปเดตทับกันข้ามเครื่อง
+      if (dbStudents && dbStudents.length > 0) {
+        // เคารพข้อมูลในฐานข้อมูลเสมอเป็น Source of Truth
         console.log('[Supabase Sync] Hydrating students from Supabase to Local...');
         const parsedStudents = dbStudents.map((s: any) => ({
           id: s.id,
@@ -1895,13 +1895,9 @@ export async function initializeSupabaseSync() {
           contact: s.contact || undefined
         }));
         safeSetItem('pink69_students', JSON.stringify(parsedStudents));
-        isStudentsTableLoaded = true;
-      } else {
-        // อัปโหลดข้อมูลขึ้น DB เพื่อความถูกต้องหรือกู้คืนอัตโนมัติ (เช่น กรณี DB ถูกล้างแต่ในเครื่องผู้ใช้ยังมีข้อมูลค้างดีอยู่)
-        console.log('[Supabase Sync] Uploading or recovering local student duties to Supabase...');
-        await uploadStudentsToSupabase(localStudents);
-        isStudentsTableLoaded = true;
       }
+      // Always set loaded to true after fetch attempt completes, without uploading defaults
+      isStudentsTableLoaded = true;
     }
 
     // 2. ดึงข้อมูลกีฬา
@@ -1918,16 +1914,6 @@ export async function initializeSupabaseSync() {
           lineup: s.lineup || []
         }));
         safeSetItem('pink69_sports', JSON.stringify(parsedSports));
-      } else {
-        const localRaw = safeGetItem('pink69_sports');
-        const localSports = safeJsonParse(localRaw, INITIAL_SPORTS);
-        const sportsData = localSports.map(s => ({
-          id: s.id,
-          name: s.name,
-          category: s.category,
-          lineup: s.lineup
-        }));
-        await supabase.from('pink69_sports').upsert(sportsData);
       }
     }
 
@@ -1948,18 +1934,6 @@ export async function initializeSupabaseSync() {
           createdBy: s.created_by
         }));
         safeSetItem('pink69_announcements', JSON.stringify(parsedAnn));
-      } else {
-        const localRaw = safeGetItem('pink69_announcements');
-        const localAnn = safeJsonParse(localRaw, DEFAULT_ANNOUNCEMENTS);
-        const annData = localAnn.map(s => ({
-          id: s.id,
-          title: s.title,
-          content: s.content,
-          image: s.image || null,
-          date: s.date,
-          created_by: s.createdBy
-        }));
-        await supabase.from('pink69_announcements').upsert(annData);
       }
     }
 

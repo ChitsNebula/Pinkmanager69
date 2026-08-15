@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   AlertTriangle, ChevronLeft, ChevronRight, Play, Pause, Plus, Trash2,
-  Lock, Unlock, Settings, User, Image as ImageIcon, Save, X
+  Lock, Unlock, Settings, User, Image as ImageIcon, Save, X, CheckCircle
 } from 'lucide-react';
 import { Student } from '../../app/mockData';
 import {
@@ -40,6 +40,75 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
   const [isMouseDown, setIsMouseDown] = useState<boolean>(false);
   const isMouseDownRef = useRef(isMouseDown);
   const gridContainerRef = useRef<HTMLDivElement>(null);
+
+  // Unsaved changes & local state for uninterrupted painting
+  const [workingSongs, setWorkingSongs] = useState<Song[]>(data.songs);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  const [pendingNav, setPendingNav] = useState<{
+    type: 'word' | 'segment' | 'song';
+    segmentIndex?: number;
+    wordIndex?: number;
+    songId?: string;
+  } | null>(null);
+  const [showSaveToast, setShowSaveToast] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) {
+      setWorkingSongs(data.songs);
+    }
+  }, [data.songs, hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  const executeNavigation = (nav: { type: string; segmentIndex?: number; wordIndex?: number; songId?: string }) => {
+    setIsPlaying(false);
+    if (nav.songId && nav.songId !== selectedSongId) {
+      setSelectedSongId(nav.songId);
+      setActiveSegmentIndex(nav.segmentIndex ?? 0);
+      setActiveWordIndex(nav.wordIndex ?? 0);
+    } else if (nav.segmentIndex !== undefined && nav.segmentIndex !== activeSegmentIndex) {
+      setActiveSegmentIndex(nav.segmentIndex);
+      setActiveWordIndex(nav.wordIndex ?? 0);
+    } else if (nav.wordIndex !== undefined && nav.wordIndex !== activeWordIndex) {
+      setActiveWordIndex(nav.wordIndex);
+    }
+  };
+
+  const handleAttemptNavigate = (target: { segmentIndex?: number; wordIndex?: number; songId?: string }) => {
+    const targetSongId = target.songId ?? selectedSongId;
+    const targetSegIdx = target.segmentIndex ?? activeSegmentIndex;
+    const targetWordIdx = target.wordIndex ?? activeWordIndex;
+
+    if (targetSongId === selectedSongId && targetSegIdx === activeSegmentIndex && targetWordIdx === activeWordIndex) {
+      return;
+    }
+
+    const navType: 'word' | 'segment' | 'song' = target.songId ? 'song' : target.segmentIndex !== undefined ? 'segment' : 'word';
+    const navObj = { type: navType, ...target };
+
+    if (hasUnsavedChanges) {
+      setPendingNav(navObj);
+    } else {
+      executeNavigation(navObj);
+    }
+  };
+
+  const handleSaveChanges = () => {
+    const song = workingSongs.find((s: Song) => s.id === selectedSongId);
+    const songName = song ? song.title : '';
+    saveSongs(workingSongs, currentUser, `บันทึกแผนผังแปรอักษรในเพลง "${songName}"`);
+    setHasUnsavedChanges(false);
+    setShowSaveToast(true);
+    setTimeout(() => setShowSaveToast(false), 2500);
+  };
 
   useEffect(() => {
     isMouseDownRef.current = isMouseDown;
@@ -80,7 +149,7 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
   // Playback interval
   useEffect(() => {
     if (!isPlaying) return;
-    const currentSong = data.songs.find((s: Song) => s.id === selectedSongId);
+    const currentSong = workingSongs.find((s: Song) => s.id === selectedSongId);
     if (!currentSong || currentSong.segments.length === 0) { setIsPlaying(false); return; }
     const interval = setInterval(() => {
       const segIdx = activeSegRef.current;
@@ -97,7 +166,7 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
       }
     }, playbackSpeed);
     return () => clearInterval(interval);
-  }, [isPlaying, playbackSpeed, selectedSongId, data.songs]);
+  }, [isPlaying, playbackSpeed, selectedSongId, workingSongs]);
 
   const handleAddSong = (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,17 +224,15 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
   const handleUpdateSeatVisual = (songId: string, segmentIndex: number, wordIndex: number, seatLabel: string, value: string) => {
     if (!currentUser || !isController) return;
     
-    // Read the fresh current songs directly from the store instead of the stale data.songs props
-    const freshSongs = getStoredData().songs;
-    const song = freshSongs.find((s: Song) => s.id === songId);
+    const song = workingSongs.find((s: Song) => s.id === songId);
     if (song?.isLocked) return;
     const targetValue = value === '' ? 'none' : value;
     
-    const nextSongs = freshSongs.map((song: Song) => {
-      if (song.id === songId) {
-        const nextSegments = song.segments.map((seg, idx) => {
+    const nextSongs = workingSongs.map((songItem: Song) => {
+      if (songItem.id === songId) {
+        const nextSegments = songItem.segments.map((seg, idx) => {
           if (idx === segmentIndex) {
-            const currentResolved = getResolvedVisuals(song, segmentIndex, wordIndex);
+            const currentResolved = getResolvedVisuals(songItem, segmentIndex, wordIndex);
             const nextWords = seg.words.map((w, wIdx) => {
               if (wIdx === wordIndex) {
                 const currentWordVisuals = w.visuals || { ...currentResolved };
@@ -186,11 +253,13 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
           }
           return seg;
         });
-        return { ...song, segments: nextSegments };
+        return { ...songItem, segments: nextSegments };
       }
-      return song;
+      return songItem;
     });
-    saveSongs(nextSongs); // Silently save visuals for smooth drawing performance
+
+    setWorkingSongs(nextSongs);
+    setHasUnsavedChanges(true);
   };
 
   // Touch device drawing logic with passive: false to prevent scrolling
@@ -258,17 +327,17 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
 
   const handleBulkUpdateVisuals = (songId: string, segmentIndex: number, wordIndex: number, mode: 'fill' | 'clear', value?: string) => {
     if (!currentUser || !isController) return;
-    const song = data.songs.find((s: Song) => s.id === songId);
+    const song = workingSongs.find((s: Song) => s.id === songId);
     if (song?.isLocked) {
       alert(`เพลง "${song.title}" ถูกล็อกอยู่ ไม่สามารถแก้ไขแผนผังแปรอักษรได้ กรุณาปลดล็อกก่อนครับ`);
       return;
     }
     const targetValue = (mode === 'fill' && (value === '' || !value)) ? 'none' : (value || '');
-    const nextSongs = data.songs.map((song: Song) => {
-      if (song.id === songId) {
-        const nextSegments = song.segments.map((seg, idx) => {
+    const nextSongs = workingSongs.map((sItem: Song) => {
+      if (sItem.id === songId) {
+        const nextSegments = sItem.segments.map((seg, idx) => {
           if (idx === segmentIndex) {
-            const currentResolved = getResolvedVisuals(song, segmentIndex, wordIndex);
+            const currentResolved = getResolvedVisuals(sItem, segmentIndex, wordIndex);
             const nextWords = seg.words.map((w, wIdx) => {
               if (wIdx === wordIndex) {
                 const currentWordVisuals = { ...(w.visuals || currentResolved) };
@@ -292,26 +361,18 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
           }
           return seg;
         });
-        return { ...song, segments: nextSegments };
+        return { ...sItem, segments: nextSegments };
       }
-      return song;
+      return sItem;
     });
-    const songName = song ? song.title : 'ไม่ระบุชื่อเพลง';
-    const segment = song?.segments[segmentIndex];
-    const word = segment?.words[wordIndex];
-    const wordText = word ? word.text : `คำที่ ${wordIndex + 1}`;
-    saveSongs(
-      nextSongs, 
-      currentUser, 
-      mode === 'fill' 
-        ? `เทสีแปรอักษรทั้งหมดเป็น "${value}" ของคำว่า "${wordText}" ในเพลง "${songName}"` 
-        : `ล้างแผนผังแปรอักษรทั้งหมด ของคำว่า "${wordText}" ในเพลง "${songName}"`
-    );
+
+    setWorkingSongs(nextSongs);
+    setHasUnsavedChanges(true);
   };
 
-  const handleCopyPreviousWordVisuals = (songId: string, segmentIndex: number, wordIndex: number) => {
+  const handleCopyPreviousWordVisuals = (songId: string, segmentIndex: number, wordIndex: number, isInverted: boolean = false) => {
     if (!currentUser || !isController) return;
-    const song = data.songs.find((s: Song) => s.id === songId);
+    const song = workingSongs.find((s: Song) => s.id === songId);
     if (!song) return;
     if (song.isLocked) {
       alert(`เพลง "${song.title}" ถูกล็อกอยู่ ไม่สามารถคัดลอกแผนผังแปรอักษรได้ กรุณาปลดล็อกก่อนครับ`);
@@ -333,21 +394,37 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
       return;
     }
 
-    // ดึง resolved visuals ของคำก่อนหน้า
     const prevResolved = getResolvedVisuals(song, prevSegIdx, prevWordIdx);
+
+    // Prepare color inversion map
+    const activeEquipments = song.equipment.filter(equip => !isArmPoseString(equip));
+    const inversionMap: Record<string, string> = {};
+    if (isInverted && activeEquipments.length >= 2) {
+      const reversedEquipments = [...activeEquipments].reverse();
+      activeEquipments.forEach((equip, idx) => {
+        inversionMap[equip] = reversedEquipments[idx];
+      });
+    }
 
     const copiedVisuals: Record<string, string> = {};
     rows.forEach(r => {
       columns.forEach(c => {
         const label = `${r}${c}`;
-        const val = prevResolved[label];
-        copiedVisuals[label] = (val && val !== 'none') ? val : 'none';
+        let val = prevResolved[label];
+        if (val && val !== 'none') {
+          if (isInverted && inversionMap[val]) {
+            val = inversionMap[val];
+          }
+          copiedVisuals[label] = val;
+        } else {
+          copiedVisuals[label] = 'none';
+        }
       });
     });
 
-    const nextSongs = data.songs.map((s: Song) => {
-      if (s.id === songId) {
-        const nextSegments = s.segments.map((seg, idx) => {
+    const nextSongs = workingSongs.map((sItem: Song) => {
+      if (sItem.id === songId) {
+        const nextSegments = sItem.segments.map((seg, idx) => {
           if (idx === segmentIndex) {
             const nextWords = seg.words.map((w, wIdx) => {
               if (wIdx === wordIndex) {
@@ -365,22 +442,13 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
           }
           return seg;
         });
-        return { ...s, segments: nextSegments };
+        return { ...sItem, segments: nextSegments };
       }
-      return s;
+      return sItem;
     });
 
-    const currentWord = song.segments[segmentIndex]?.words[wordIndex];
-    const currentWordText = currentWord ? currentWord.text : `คำที่ ${wordIndex + 1}`;
-    const prevSegment = song.segments[prevSegIdx];
-    const prevWord = prevSegment?.words[prevWordIdx];
-    const prevWordText = prevWord ? prevWord.text : `คำก่อนหน้า`;
-
-    saveSongs(
-      nextSongs,
-      currentUser,
-      `คัดลอกรูปแบบแปรอักษรจากคำว่า "${prevWordText}" มายังคำว่า "${currentWordText}"`
-    );
+    setWorkingSongs(nextSongs);
+    setHasUnsavedChanges(true);
   };
 
   const handleUpdateSongEquipment = (songId: string, updatedEquips: string[], deletedEquip?: string) => {
@@ -632,358 +700,165 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
                     };
 
                     return (
-                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        {/* Student personal instruction panel */}
-                        <div className="lg:col-span-7 space-y-6">
-                          <div className="bg-carbon-card border border-pink-primary/20 rounded-2xl p-5 space-y-4 shadow">
-                            <div className="flex items-center justify-between border-b border-pink-primary/10 pb-3">
-                              <div>
-                                <span className="text-xs text-pink-primary uppercase font-bold tracking-wider">ตำแหน่งของคุณ</span>
-                                <h3 className="text-2xl font-bold text-white">ที่นั่งรหัส {mySeat}</h3>
-                              </div>
-                              <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-3 py-1 rounded-full text-xs font-semibold">
-                                เชื่อมต่อสำเร็จ
-                              </span>
-                            </div>
+                      <div className="flex flex-col gap-5">
 
-                            {/* Song selector for student */}
+                        {/* Top card: Seat + Song + Equipment */}
+                        <div className="bg-carbon-card border border-pink-primary/20 rounded-2xl p-5 space-y-4 shadow">
+                          <div className="flex items-center justify-between border-b border-pink-primary/10 pb-3">
                             <div>
-                              <label className="text-xs text-text-secondary block mb-1.5">เลือกเพลงเชียร์</label>
-                              <select
-                                value={selectedSongId}
-                                onChange={(e) => {
-                                  setSelectedSongId(e.target.value);
-                                  setActiveSegmentIndex(0);
-                                }}
-                                className="w-full bg-carbon-dark border border-pink-primary/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-primary text-white"
-                              >
-                                {data.songs.map((song: Song) => (
-                                  <option key={song.id} value={song.id}>{song.title}</option>
-                                ))}
-                              </select>
+                              <span className="text-xs text-pink-primary uppercase font-bold tracking-wider">ตำแหน่งของคุณ</span>
+                              <h3 className="text-2xl font-bold text-white">ที่นั่งรหัส {mySeat}</h3>
                             </div>
-
-                            {/* Practice Mode Simulation for Student */}
-                            {currentSong && (() => {
-                              const getSegmentColorStyle = (seg: { visuals: Record<string, string> }) => {
-                                const action = seg.visuals[mySeat] || 'none';
-                                if (isArmPoseString(action)) {
-                                  const pose = parseArmPose(action);
-                                  if (pose) {
-                                    return {
-                                      textClass: '',
-                                      shadowStyle: { textShadow: `0 0 20px ${pose.color}` },
-                                      bgClass: 'bg-carbon-card border-2',
-                                      bgStyle: { borderColor: pose.color, color: pose.color },
-                                      label: `ท่าแขน: ${pose.name}`,
-                                      isArmPose: true,
-                                      pose: pose
-                                    };
-                                  }
-                                }
-                                const act = action.toLowerCase().trim();
-                                if (act.includes('ชมพู') || act.includes('pink')) {
-                                  return {
-                                    textClass: 'text-pink-primary',
-                                    shadowStyle: { textShadow: '0 0 20px rgba(255,46,147,0.9)' },
-                                    bgClass: 'bg-pink-primary/10 border-pink-primary/25',
-                                    label: 'เพลตชมพู'
-                                  };
-                                }
-                                if (act.includes('ขาว') || act.includes('white')) {
-                                  return {
-                                    textClass: lightTheme ? 'text-slate-800' : 'text-white',
-                                    shadowStyle: undefined,
-                                    bgClass: 'bg-white text-slate-800 border-gray-300',
-                                    label: 'เพลตขาว'
-                                  };
-                                }
-                                if (act.includes('เหลือง') || act.includes('yellow') || act.includes('ร่ม') || act.includes('umbrella')) {
-                                  return {
-                                    textClass: 'text-yellow-400',
-                                    shadowStyle: { textShadow: '0 0 20px rgba(250,204,21,0.9)' },
-                                    bgClass: 'bg-yellow-400/10 border-yellow-400/20',
-                                    label: 'เพลตเหลือง/ร่ม'
-                                  };
-                                }
-                                if (act.includes('น้ำเงิน') || act.includes('blue')) {
-                                  return {
-                                    textClass: 'text-blue-400',
-                                    shadowStyle: { textShadow: '0 0 20px rgba(96,165,250,0.9)' },
-                                    bgClass: 'bg-blue-400/10 border-blue-400/20',
-                                    label: 'เพลตน้ำเงิน'
-                                  };
-                                }
-                                if (act.includes('เขียว') || act.includes('green')) {
-                                  return {
-                                    textClass: 'text-green-400',
-                                    shadowStyle: { textShadow: '0 0 20px rgba(74,222,128,0.9)' },
-                                    bgClass: 'bg-green-400/10 border-green-400/20',
-                                    label: 'เพลตเขียว'
-                                  };
-                                }
-                                if (act.includes('แดง') || act.includes('red')) {
-                                  return {
-                                    textClass: 'text-red-400',
-                                    shadowStyle: { textShadow: '0 0 20px rgba(248,113,113,0.9)' },
-                                    bgClass: 'bg-red-400/10 border-red-400/20',
-                                    label: 'เพลตแดง'
-                                  };
-                                }
-                                return {
-                                  textClass: 'text-pink-primary',
-                                  shadowStyle: { textShadow: '0 0 15px rgba(255,46,147,0.6)' },
-                                  bgClass: 'bg-pink-primary/10 border-pink-primary/20',
-                                  label: 'หมอบ / เอาป้ายลง'
-                                };
-                              };
-
-                              const currentStyle = getSegmentColorStyle(currentSong.segments[activeSegmentIndex] || {});
-
-                              return (
-                                  <div className="bg-carbon-dark border border-pink-primary/5 rounded-xl p-4 space-y-4">
-                                    <div className="flex items-center justify-between pb-2 border-b border-pink-primary/5">
-                                      <span className="text-xs font-bold text-pink-accent">โหมดซ้อมร้องเพลงและชูเพลต (ส่วนตัว)</span>
-                                      <button
-                                        onClick={() => setIsPlaying(!isPlaying)}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                          isPlaying ? 'bg-yellow-500 text-white' : 'bg-pink-primary text-white'
-                                        }`}
-                                      >
-                                        {isPlaying ? '⏸ หยุดจำลอง' : '▶ เริ่มจำลอง'}
-                                      </button>
-                                    </div>
-
-                                    {/* Speed Control Slider & Input like Image 2 */}
-                                    <div className="space-y-2 pt-1">
-                                      <div className="flex justify-between items-center text-xs">
-                                        <span className="text-text-secondary">ความเร็วท่อนเพลง (ms):</span>
-                                        <div className="flex items-center gap-2">
-                                          <input
-                                            type="number"
-                                            min={250}
-                                            max={10000}
-                                            step={250}
-                                            value={playbackSpeed}
-                                            onChange={(e) => {
-                                              const val = Number(e.target.value);
-                                              if (val >= 0) setPlaybackSpeed(val);
-                                            }}
-                                            className="w-20 bg-carbon-card border border-pink-primary/10 rounded-lg px-2 py-1 text-xs text-center text-pink-primary font-bold focus:outline-none focus:border-pink-primary"
-                                          />
-                                          <span className="text-text-secondary">({(playbackSpeed / 1000).toFixed(2)} วินาที/คำ)</span>
-                                        </div>
-                                      </div>
-                                      <input
-                                        type="range"
-                                        min={250}
-                                        max={5000}
-                                        step={250}
-                                        value={playbackSpeed}
-                                        onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
-                                        className="w-full accent-pink-primary cursor-pointer"
-                                      />
-                                    </div>
-
-                                  {/* Horizontal Scrolling Karaoke Bar */}
-                                  <div className="bg-carbon-card border border-pink-primary/10 rounded-2xl p-4 text-center relative overflow-hidden shadow-inner flex flex-col items-center justify-center min-h-[120px] w-full">
-                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-pink-primary/5 to-transparent animate-pulse pointer-events-none" />
-                                    
-                                    {/* Action indicator badge */}
-                                    {(() => {
-                                      const resolvedCurrent = getResolvedVisuals(currentSong, activeSegmentIndex, activeWordIndex);
-                                      const currentStyle = getSegmentColorStyle({ visuals: resolvedCurrent });
-                                      return (
-                                        <div className="flex flex-col items-center">
-                                          <div className={`mb-3 px-3 py-1 rounded-full text-[11px] font-bold transition-all border uppercase tracking-wider ${currentStyle.bgClass} ${currentStyle.textClass}`} style={currentStyle.bgStyle}>
-                                            คิวเพลตของคุณ: {currentStyle.label}
-                                          </div>
-                                          {currentStyle.isArmPose && currentStyle.pose && (
-                                            <div className="w-16 h-16 mb-2 bg-carbon-dark/50 rounded-xl p-1 border border-pink-primary/10">
-                                              <ArmPoseMiniSVG pose={currentStyle.pose} />
-                                            </div>
-                                          )}
-                                        </div>
-                                      );
-                                    })()}
-
-                                    {/* Scroll Wrapper */}
-                                    <div className="w-full max-w-2xl relative overflow-hidden py-2">
-                                      <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-carbon-card to-transparent pointer-events-none z-10" />
-                                      <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-carbon-card to-transparent pointer-events-none z-10" />
-
-                                      <div 
-                                        ref={karaokeContainerRef}
-                                        style={{
-                                          scrollbarWidth: 'none',
-                                          msOverflowStyle: 'none'
-                                        }}
-                                        className="w-full overflow-x-auto flex items-center justify-start scroll-smooth py-1 px-[40%] md:px-[45%] [&::-webkit-scrollbar]:hidden"
-                                      >
-                                        {currentSong.segments.map((seg, idx) => {
-                                          const isActive = activeSegmentIndex === idx;
-                                          const isNext = activeSegmentIndex + 1 === idx;
-                                          const segResolved = getResolvedVisuals(currentSong, idx, seg.words?.length ? seg.words.length - 1 : 0);
-                                          const style = getSegmentColorStyle({ visuals: segResolved });
-
-                                          let textClass = '';
-                                          let shadowStyle = undefined;
-                                          let opacityClass = 'opacity-40 hover:opacity-100';
-
-                                          if (isActive) {
-                                            textClass = `${style.textClass} text-xl md:text-2xl scale-110 ${style.bgClass} border karaoke-active`;
-                                            shadowStyle = style.shadowStyle;
-                                            opacityClass = 'opacity-100';
-                                          } else if (isNext) {
-                                            textClass = `${style.textClass} text-base md:text-lg`;
-                                            opacityClass = 'opacity-75 hover:opacity-100';
-                                          } else {
-                                            textClass = `${style.textClass} text-base md:text-lg`;
-                                          }
-
-                                          return (
-                                            <span
-                                              key={seg.id}
-                                              onClick={() => {
-                                                setIsPlaying(false);
-                                                setActiveSegmentIndex(idx);
-                                                setActiveWordIndex(0);
-                                              }}
-                                              style={shadowStyle}
-                                              className={`transition-all duration-300 cursor-pointer rounded-xl px-4 py-1.5 font-bold whitespace-nowrap flex-shrink-0 text-center mx-3 hover:scale-105 flex items-center gap-1.5 ${textClass} ${opacityClass}`}
-                                            >
-                                              {seg.words.map((word, wIdx) => {
-                                                const wordResolved = getResolvedVisuals(currentSong, idx, wIdx);
-                                                const seatAction = wordResolved[mySeat] || 'none';
-                                                
-                                                const act = seatAction.toLowerCase().trim();
-                                                let wordColorClass = 'text-text-secondary/60';
-                                                if (act.includes('ชมพู') || act.includes('pink')) wordColorClass = 'text-pink-primary';
-                                                else if (act.includes('ขาว') || act.includes('white')) wordColorClass = lightTheme ? 'text-slate-800' : 'text-white';
-                                                else if (act.includes('เหลือง') || act.includes('yellow') || act.includes('ร่ม')) wordColorClass = 'text-yellow-400';
-                                                else if (act.includes('น้ำเงิน') || act.includes('blue')) wordColorClass = 'text-blue-400';
-                                                else if (act.includes('เขียว') || act.includes('green')) wordColorClass = 'text-green-400';
-                                                else if (act.includes('แดง') || act.includes('red')) wordColorClass = 'text-red-400';
-
-                                                const isWordActive = isActive && activeWordIndex === wIdx;
-
-                                                return (
-                                                  <span
-                                                    key={wIdx}
-                                                    className={`transition-all duration-200 ${wordColorClass} ${
-                                                      isWordActive 
-                                                        ? 'underline decoration-2 underline-offset-4 font-black scale-105' 
-                                                        : ''
-                                                    }`}
-                                                  >
-                                                    {word.text}
-                                                  </span>
-                                                );
-                                              })}
-                                            </span>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Action display */}
-                                  {(() => {
-                                    const resolvedCurrent = getResolvedVisuals(currentSong, activeSegmentIndex, activeWordIndex);
-                                    const currentMyAction = resolvedCurrent[mySeat] || 'none';
-                                    const actionColorStyle = getSeatColorStyle(currentMyAction, currentSong.equipment);
-                                    return (
-                                      <div
-                                        style={actionColorStyle.style}
-                                        className={`border rounded-xl p-4 flex flex-col justify-center items-center text-center space-y-1 transition-all ${actionColorStyle.className}`}
-                                      >
-                                        <span className="text-[10px] uppercase opacity-75">สิ่งที่ต้องทำสำหรับที่นั่งคุณ</span>
-                                        <h4 className="text-xl font-black tracking-wider">
-                                          {getActionText(currentMyAction)}
-                                        </h4>
-                                        <span className="text-[11px] opacity-75 mt-2">
-                                          อุปกรณ์ที่ใช้: {currentMyAction || 'ไม่ต้องใช้'}
-                                        </span>
-                                      </div>
-                                    );
-                                  })()}
-                                </div>
-                              );
-                            })()}
+                            <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-3 py-1 rounded-full text-xs font-semibold">
+                              เชื่อมต่อสำเร็จ
+                            </span>
                           </div>
+
+                          {/* Song selector */}
+                          <div>
+                            <label className="text-xs text-text-secondary block mb-1.5 font-semibold">เลือกเพลงเชียร์</label>
+                            <select
+                              value={selectedSongId}
+                              onChange={(e) => {
+                                setSelectedSongId(e.target.value);
+                                setActiveSegmentIndex(0);
+                              }}
+                              className="w-full bg-carbon-dark border border-pink-primary/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-primary text-white font-semibold"
+                            >
+                              {data.songs.map((song: Song) => (
+                                <option key={song.id} value={song.id}>{song.title}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Equipment list for current song */}
+                          {currentSong && currentSong.equipment.filter((e: string) => !isArmPoseString(e)).length > 0 && (
+                            <div>
+                              <span className="text-xs text-text-secondary font-semibold block mb-2">อุปกรณ์ที่ต้องใช้ในเพลงนี้</span>
+                              <div className="flex flex-wrap gap-2">
+                                {currentSong.equipment.filter((e: string) => !isArmPoseString(e)).map((equip: string) => {
+                                  const style = getSeatColorStyle(equip, currentSong.equipment);
+                                  return (
+                                    <span
+                                      key={equip}
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${style.className}`}
+                                      style={style.style}
+                                    >
+                                      {getEquipmentDisplayName(equip)}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
 
-                        {/* Cheering Lyrics Panel (Replacing the leaked grid) */}
-                        <div className="lg:col-span-5 space-y-6">
-                          <Panel title={`เนื้อเพลง "${currentSong?.title || ''}"`}>
-                            <div className="p-4 bg-carbon-dark/40 border border-pink-primary/10 rounded-2xl max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin space-y-3">
-                              {currentSong?.segments.map((seg, idx) => {
-                                const isActive = activeSegmentIndex === idx;
-                                return (
-                                  <div
-                                    key={seg.id}
-                                    onClick={() => { setIsPlaying(false); setActiveSegmentIndex(idx); setActiveWordIndex(0); }}
-                                    className={`cursor-pointer rounded-xl px-3 py-2 transition-all border ${
-                                      isActive
-                                        ? 'bg-pink-primary/10 border-pink-primary/30 scale-[1.01]'
-                                        : 'bg-transparent border-transparent hover:bg-carbon-light/30 hover:border-pink-primary/10'
-                                    }`}
-                                  >
-                                    <span className="text-[10px] text-pink-accent/60 font-semibold block mb-1">ท่อนที่ {idx + 1}</span>
-                                    <div className="flex flex-wrap gap-1 items-center">
-                                      {(seg.words || []).map((word, wIdx) => {
-                                        const wordResolved = getResolvedVisuals(currentSong, idx, wIdx);
-                                        const wordAction = wordResolved[mySeat] || 'none';
-                                        const isWordActive = isActive && activeWordIndex === wIdx;
-                                        
-                                        const act = wordAction.toLowerCase().trim();
-                                        let wordColorClass = 'text-text-secondary/60';
-                                        if (act.includes('ชมพู') || act.includes('pink')) wordColorClass = 'text-pink-primary';
-                                        else if (act.includes('ขาว') || act.includes('white')) wordColorClass = lightTheme ? 'text-slate-800' : 'text-white';
-                                        else if (act.includes('เหลือง') || act.includes('yellow') || act.includes('ร่ม')) wordColorClass = 'text-yellow-400';
-                                        else if (act.includes('น้ำเงิน') || act.includes('blue')) wordColorClass = 'text-blue-400';
-                                        else if (act.includes('เขียว') || act.includes('green')) wordColorClass = 'text-green-400';
-                                        else if (act.includes('แดง') || act.includes('red')) wordColorClass = 'text-red-400';
+                        {/* Lyrics panel */}
+                        <Panel title={`เนื้อเพลง "${currentSong?.title || ''}"`}>
+                          <div className="p-3 bg-carbon-dark/40 border border-pink-primary/10 rounded-2xl max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin space-y-1">
+                            {currentSong?.segments.map((seg, idx) => {
+                              const isActive = activeSegmentIndex === idx;
+                              return (
+                                <div
+                                  key={seg.id}
+                                  onClick={() => { setIsPlaying(false); setActiveSegmentIndex(idx); setActiveWordIndex(0); }}
+                                  className={`cursor-pointer rounded-lg px-2.5 py-1 transition-all border ${
+                                    isActive
+                                      ? 'bg-pink-primary/10 border-pink-primary/30 scale-[1.01]'
+                                      : 'bg-transparent border-transparent hover:bg-carbon-light/30 hover:border-pink-primary/10'
+                                  }`}
+                                  style={{ contentVisibility: 'auto' }}
+                                >
+                                  <div className="flex flex-wrap gap-x-0.5 gap-y-1 items-center">
+                                    <span className="text-[10px] text-pink-accent/50 font-bold mr-1 shrink-0 select-none">ท่อน {idx + 1}:</span>
+                                    {(seg.words || []).map((word, wIdx) => {
+                                      const wordResolved = getResolvedVisuals(currentSong, idx, wIdx);
+                                      const wordAction = wordResolved[mySeat] || 'none';
+                                      const isWordActive = isActive && activeWordIndex === wIdx;
+                                      
+                                      const act = wordAction.toLowerCase().trim();
+                                      let wordColorClass = 'text-text-secondary/60';
+                                      let extraStyle: React.CSSProperties = {};
+                                      let badgeClass = 'bg-transparent border border-transparent';
 
-                                        const hexMatch = act.match(/\((#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3})\)$/);
-                                        let customWordStyle: React.CSSProperties = {};
-                                        if (hexMatch && !isWordActive) {
-                                          customWordStyle = { color: hexMatch[1] };
+                                      if (act !== 'none' && act !== '') {
+                                        if (act.includes('ชมพู') || act.includes('pink')) {
+                                          wordColorClass = 'text-white';
+                                          badgeClass = 'bg-pink-500 border-pink-600/30 font-bold text-white shadow-sm';
+                                        } else if (act.includes('ขาว') || act.includes('white')) {
+                                          wordColorClass = 'text-slate-800';
+                                          badgeClass = 'bg-white border-slate-300 font-bold text-slate-800 shadow-sm';
+                                        } else if (act.includes('เหลือง') || act.includes('yellow') || act.includes('ร่ม')) {
+                                          wordColorClass = 'text-slate-900';
+                                          badgeClass = 'bg-yellow-400 border-yellow-500/30 font-bold text-slate-900 shadow-sm';
+                                        } else if (act.includes('น้ำเงิน') || act.includes('blue')) {
+                                          wordColorClass = 'text-white';
+                                          badgeClass = 'bg-blue-600 border-blue-700/30 font-bold text-white shadow-sm';
+                                        } else if (act.includes('เขียว') || act.includes('green')) {
+                                          wordColorClass = 'text-white';
+                                          badgeClass = 'bg-green-600 border-green-700/30 font-bold text-white shadow-sm';
+                                        } else if (act.includes('แดง') || act.includes('red')) {
+                                          wordColorClass = 'text-white';
+                                          badgeClass = 'bg-red-600 border-red-700/30 font-bold text-white shadow-sm';
                                         }
 
-                                        return (
-                                          <span
-                                            key={wIdx}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setIsPlaying(false);
-                                              setActiveSegmentIndex(idx);
-                                              setActiveWordIndex(wIdx);
-                                            }}
-                                            style={customWordStyle}
-                                            className={`text-sm font-bold transition-all rounded-md px-1.5 py-0.5 cursor-pointer hover:bg-carbon-light/40 select-none ${
-                                              isWordActive
-                                                ? `${wordColorClass} ring-2 ring-pink-primary bg-carbon-light scale-110 shadow-sm text-text-primary`
-                                                : word.isTagged
-                                                  ? `${wordColorClass} ring-1 ring-current/40 bg-current/5`
-                                                  : 'text-text-secondary/70'
-                                            }`}
-                                          >
-                                            {word.isTagged && <span className="text-[8px] mr-0.5">★</span>}
-                                            {word.text}
-                                          </span>
-                                        );
-                                      })}
-                                    </div>
+                                        const hexMatch = act.match(/\((#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3})\)$/);
+                                        if (hexMatch) {
+                                          const hexColor = hexMatch[1];
+                                          let r = 0, g = 0, b = 0;
+                                          if (hexColor.length === 4) {
+                                            r = parseInt(hexColor[1] + hexColor[1], 16);
+                                            g = parseInt(hexColor[2] + hexColor[2], 16);
+                                            b = parseInt(hexColor[3] + hexColor[3], 16);
+                                          } else if (hexColor.length === 7) {
+                                            r = parseInt(hexColor.slice(1, 3), 16);
+                                            g = parseInt(hexColor.slice(3, 5), 16);
+                                            b = parseInt(hexColor.slice(5, 7), 16);
+                                          }
+                                          const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+                                          const textColor = brightness > 128 ? '#0f1016' : '#ffffff';
+                                          
+                                          extraStyle.backgroundColor = hexColor;
+                                          extraStyle.color = textColor;
+                                          extraStyle.borderColor = brightness > 128 ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)';
+                                          badgeClass = 'border font-bold shadow-sm';
+                                          wordColorClass = '';
+                                        }
+                                      }
+
+                                      return (
+                                        <span
+                                          key={wIdx}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setIsPlaying(false);
+                                            setActiveSegmentIndex(idx);
+                                            setActiveWordIndex(wIdx);
+                                          }}
+                                          style={extraStyle}
+                                          className={`text-sm transition-all rounded px-2 py-0.5 cursor-pointer hover:opacity-90 select-none ${badgeClass} ${wordColorClass} ${
+                                            isWordActive
+                                              ? 'ring-2 ring-pink-primary scale-110 shadow-md font-extrabold relative z-10'
+                                              : word.isTagged
+                                                ? 'ring-1 ring-current/40 bg-current/5'
+                                                : 'text-text-secondary/70'
+                                          }`}
+                                        >
+                                          {word.isTagged && <span className="text-[8px] mr-0.5">★</span>}
+                                          {word.text}
+                                        </span>
+                                      );
+                                    })}
                                   </div>
-                                );
-                              })}
-                            </div>
-                          </Panel>
-                        </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </Panel>
 
                       </div>
                     );
+
                   })()
 
                 )}
@@ -993,7 +868,7 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
             {/* CONTROLLER / STAFF VIEW */}
             {isController && (
               (() => {
-                const currentSong = data.songs.find((s: Song) => s.id === selectedSongId) || data.songs[0];
+                const currentSong = workingSongs.find((s: Song) => s.id === selectedSongId) || workingSongs[0];
                 const activeSegment = currentSong?.segments[activeSegmentIndex];
                 const resolvedVisuals = getResolvedVisuals(currentSong, activeSegmentIndex, activeWordIndex);
 
@@ -1015,7 +890,7 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
                               }}
                               className="flex-1 bg-carbon-dark border border-pink-primary/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-pink-primary text-white font-semibold"
                             >
-                              {data.songs.map((song: Song) => (
+                              {workingSongs.map((song: Song) => (
                                 <option key={song.id} value={song.id}>
                                   {song.isLocked ? `🔒 ${song.title}` : song.title}
                                 </option>
@@ -1290,36 +1165,80 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
                               </h3>
                             </div>
                             
-                            {/* Color Palette selectors */}
+                            {/* Action Buttons / Shortcuts */}
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-xs text-text-secondary mr-1">แปรงทาสี:</span>
-                              {currentSong.equipment
-                                .filter(equip => !isArmPoseString(equip))
-                                .map(equip => {
-                                  const btnStyle = getSeatColorStyle(equip, currentSong.equipment);
-                                  return (
-                                    <button
-                                      key={equip}
-                                      onClick={() => setDragColor(equip)}
-                                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${btnStyle.className} ${
-                                        dragColor === equip ? 'ring-2 ring-pink-primary ring-offset-2 ring-offset-carbon-card font-black scale-105' : 'opacity-70 hover:opacity-100'
-                                      }`}
-                                      style={btnStyle.style}
-                                    >
-                                      <div className="flex items-center gap-1.5">
-                                        <span>{getEquipmentDisplayName(equip)}</span>
-                                      </div>
-                                    </button>
-                                  );
-                                })}
-                              
                               <button
-                                onClick={() => setDragColor('')}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border bg-carbon-light border-red-500/20 text-red-400 transition-all ${
-                                  dragColor === '' ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-carbon-card font-black scale-105' : 'opacity-70 hover:opacity-100'
+                                type="button"
+                                onClick={handleSaveChanges}
+                                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                  hasUnsavedChanges
+                                    ? 'bg-pink-primary hover:bg-pink-accent text-white shadow-lg shadow-pink-primary/30 ring-2 ring-pink-primary/50 animate-pulse cursor-pointer scale-105'
+                                    : 'bg-carbon-dark border border-pink-primary/10 text-text-tertiary opacity-70 cursor-default'
                                 }`}
                               >
-                                ยางลบ (ลบโค้ด)
+                                <Save size={14} />
+                                <span>{hasUnsavedChanges ? 'บันทึกข้อมูล *' : 'บันทึกเรียบร้อย'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (dragColor === '') {
+                                    alert('กรุณาเลือกสีแปรงทาสีก่อนกดเทสีครับ!');
+                                    return;
+                                  }
+                                  handleBulkUpdateVisuals(selectedSongId, activeSegmentIndex, activeWordIndex, 'fill', dragColor);
+                                }}
+                                className="bg-carbon-dark hover:bg-carbon-light border border-pink-primary/10 text-text-primary px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                              >
+                                เทสีทั้งหมดในหน้านี้ (Fill)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleBulkUpdateVisuals(selectedSongId, activeSegmentIndex, activeWordIndex, 'clear')}
+                                className="bg-carbon-dark hover:bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                              >
+                                ล้างหน้านี้ทั้งหมด (Clear)
+                              </button>
+                              {(() => {
+                                const hasPrevWord = activeWordIndex > 0 || activeSegmentIndex > 0;
+                                return (
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyPreviousWordVisuals(selectedSongId, activeSegmentIndex, activeWordIndex)}
+                                      disabled={!hasPrevWord}
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 border ${
+                                        hasPrevWord
+                                          ? 'bg-pink-primary/10 hover:bg-pink-primary/20 border-pink-primary/30 text-pink-accent cursor-pointer hover:scale-[1.02] active:scale-95'
+                                          : 'bg-carbon-light/20 border-pink-primary/5 text-text-tertiary opacity-50 cursor-not-allowed'
+                                      }`}
+                                      title={hasPrevWord ? 'คัดลอกรูปแบบการแปรอักษรจากคำร้องก่อนหน้านี้' : 'ไม่มีคำก่อนหน้า'}
+                                    >
+                                      📋 คัดลอกคำก่อนหน้า
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyPreviousWordVisuals(selectedSongId, activeSegmentIndex, activeWordIndex, true)}
+                                      disabled={!hasPrevWord}
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 border ${
+                                        hasPrevWord
+                                          ? 'bg-yellow-500/10 hover:bg-yellow-500/20 border-yellow-500/30 text-yellow-500 cursor-pointer hover:scale-[1.02] active:scale-95'
+                                          : 'bg-carbon-light/20 border-pink-primary/5 text-text-tertiary opacity-50 cursor-not-allowed'
+                                      }`}
+                                      title={hasPrevWord ? 'คัดลอกรูปแบบการแปรอักษรจากคำร้องก่อนหน้านี้แบบสลับสีตรงข้าม' : 'ไม่มีคำก่อนหน้า'}
+                                    >
+                                      🔄 คัดลอกกลับสีกัน
+                                    </button>
+                                  </div>
+                                );
+                              })()}
+                              
+                              <button
+                                type="button"
+                                onClick={() => setShowWholePagePreview(true)}
+                                className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-md shadow-red-600/10 cursor-pointer hover:scale-[1.02] active:scale-95 flex items-center gap-1"
+                              >
+                                👁️ พรีวิวทั้งหน้า
                               </button>
                             </div>
                           </div>
@@ -1534,7 +1453,7 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
                                       <button
                                         key={wIdx}
                                         type="button"
-                                        onClick={() => setActiveWordIndex(wIdx)}
+                                        onClick={() => handleAttemptNavigate({ wordIndex: wIdx })}
                                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all select-none border flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95 ${
                                           isWordActive
                                             ? `${wordStyle.bgClass} ${wordStyle.textClass} border-pink-primary ring-2 ring-pink-primary/20 scale-105 shadow-md shadow-pink-primary/10`
@@ -1592,11 +1511,7 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
                                       return (
                                         <span
                                           key={seg.id}
-                                          onClick={() => {
-                                            setIsPlaying(false);
-                                            setActiveSegmentIndex(idx);
-                                            setActiveWordIndex(0);
-                                          }}
+                                          onClick={() => handleAttemptNavigate({ segmentIndex: idx, wordIndex: 0 })}
                                           style={shadowStyle}
                                           className={`transition-all duration-300 cursor-pointer rounded-xl px-4 py-1.5 font-bold whitespace-nowrap flex-shrink-0 text-center mx-3 hover:scale-105 flex items-center gap-1.5 ${textClass} ${opacityClass}`}
                                         >
@@ -1628,53 +1543,55 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
                           })()}
 
 
-                          {/* Shortcuts */}
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => {
-                                if (dragColor === '') {
-                                  alert('กรุณาเลือกสีแปรงทาสีก่อนกดเทสีครับ!');
-                                  return;
-                                }
-                                handleBulkUpdateVisuals(selectedSongId, activeSegmentIndex, activeWordIndex, 'fill', dragColor);
-                              }}
-                              className="bg-carbon-dark hover:bg-carbon-light border border-pink-primary/10 text-text-primary px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                            >
-                              เทสีทั้งหมดในหน้านี้ (Fill)
-                            </button>
-                            <button
-                              onClick={() => handleBulkUpdateVisuals(selectedSongId, activeSegmentIndex, activeWordIndex, 'clear')}
-                              className="bg-carbon-dark hover:bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                            >
-                              ล้างหน้านี้ทั้งหมด (Clear)
-                            </button>
-                            {(() => {
-                              const hasPrevWord = activeWordIndex > 0 || activeSegmentIndex > 0;
-                              return (
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyPreviousWordVisuals(selectedSongId, activeSegmentIndex, activeWordIndex)}
-                                  disabled={!hasPrevWord}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 border ${
-                                    hasPrevWord
-                                      ? 'bg-pink-primary/10 hover:bg-pink-primary/20 border-pink-primary/30 text-pink-accent cursor-pointer hover:scale-[1.02] active:scale-95'
-                                      : 'bg-carbon-light/20 border-pink-primary/5 text-text-tertiary opacity-50 cursor-not-allowed'
-                                  }`}
-                                  title={hasPrevWord ? 'คัดลอกรูปแบบการแปรอักษร (resolved) จากคำร้องก่อนหน้านี้' : 'ไม่มีคำก่อนหน้า'}
-                                >
-                                  📋 คัดลอกคำก่อนหน้า
-                                </button>
-                              );
-                            })()}
-                            
-                            <button
-                              type="button"
-                              onClick={() => setShowWholePagePreview(true)}
-                              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-md shadow-red-600/10 cursor-pointer hover:scale-[1.02] active:scale-95 flex items-center gap-1"
-                            >
-                              👁️ พรีวิวทั้งหน้า
-                            </button>
-                            <span className="text-xs text-text-tertiary ml-auto hidden sm:inline">
+                          {/* Color Palette selectors */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-pink-primary/10 pt-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs text-text-secondary mr-1 font-bold">แปรงทาสี:</span>
+                              {currentSong.equipment
+                                .filter(equip => !isArmPoseString(equip))
+                                .map(equip => {
+                                  const btnStyle = getSeatColorStyle(equip, currentSong.equipment);
+                                  return (
+                                    <button
+                                      key={equip}
+                                      type="button"
+                                      onClick={() => setDragColor(equip)}
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${btnStyle.className} ${
+                                        dragColor === equip ? 'ring-2 ring-pink-primary ring-offset-2 ring-offset-carbon-card font-black scale-105' : 'opacity-70 hover:opacity-100'
+                                      }`}
+                                      style={btnStyle.style}
+                                    >
+                                      <div className="flex items-center gap-1.5">
+                                        <span>{getEquipmentDisplayName(equip)}</span>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              
+                              <button
+                                type="button"
+                                onClick={() => setDragColor('')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border bg-carbon-light border-red-500/20 text-red-400 transition-all ${
+                                  dragColor === '' ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-carbon-card font-black scale-105' : 'opacity-70 hover:opacity-100'
+                                }`}
+                              >
+                                ยางลบ (ลบโค้ด)
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={handleSaveChanges}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border ${
+                                  hasUnsavedChanges
+                                    ? 'bg-pink-primary hover:bg-pink-accent text-white border-pink-accent shadow-lg shadow-pink-primary/30 ring-2 ring-pink-primary/40 animate-pulse cursor-pointer scale-105'
+                                    : 'bg-carbon-dark border-pink-primary/10 text-text-tertiary opacity-60 cursor-default'
+                                }`}
+                              >
+                                <Save size={14} />
+                                <span>{hasUnsavedChanges ? 'กดบันทึกข้อมูล *' : 'บันทึกแล้ว'}</span>
+                              </button>
+                            </div>
+                            <span className="text-xs text-text-tertiary hidden sm:inline">
                               💡 เทคนิค: คลิกแล้วลากเมาส์เพื่อระบายสีสแตนได้อย่างรวดเร็ว!
                             </span>
                           </div>
@@ -2064,6 +1981,73 @@ export function CardStuntTab({ data, currentUser, isController, isSuperControlle
           </div>
         );
       })()}
+
+      {/* Unsaved Changes Warning Modal */}
+      {pendingNav && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn font-bold">
+          <div className="w-full max-w-md bg-carbon-card border border-pink-primary/30 rounded-3xl p-6 shadow-2xl relative space-y-4">
+            <div className="flex items-center gap-3 border-b border-pink-primary/10 pb-3">
+              <div className="w-10 h-10 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center text-yellow-400 flex-shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">คุณยังไม่ได้บันทึกข้อมูล</h3>
+                <p className="text-xs text-text-secondary">มีข้อมูลลงสีที่เพิ่งแก้ไขในคำร้องนี้อยู่</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-text-primary leading-relaxed font-medium">
+              คุณต้องการ <span className="text-pink-primary font-bold">บันทึกข้อมูล</span> การลงสีคำร้องนี้ก่อนเปลี่ยนไปคำ/ท่อนเพลงอื่นหรือไม่?
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingNav(null);
+                }}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold bg-carbon-dark border border-pink-primary/10 text-text-secondary hover:text-white transition-all text-center cursor-pointer"
+              >
+                ยกเลิก (อยู่หน้านี้ต่อ)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setWorkingSongs(data.songs);
+                  setHasUnsavedChanges(false);
+                  const nav = pendingNav;
+                  setPendingNav(null);
+                  if (nav) executeNavigation(nav);
+                }}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all text-center cursor-pointer"
+              >
+                ไม่บันทึก
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleSaveChanges();
+                  const nav = pendingNav;
+                  setPendingNav(null);
+                  if (nav) executeNavigation(nav);
+                }}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-pink-primary hover:bg-pink-accent text-white shadow-lg shadow-pink-primary/20 transition-all text-center cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Save size={14} />
+                <span>บันทึกข้อมูลและไปต่อ</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save Success Toast */}
+      {showSaveToast && (
+        <div className="fixed bottom-6 right-6 z-[120] bg-green-600 text-white px-5 py-3 rounded-2xl shadow-2xl font-bold text-sm flex items-center gap-2.5 animate-bounce border border-green-400/30">
+          <CheckCircle size={20} />
+          <span>บันทึกแผนผังแปรอักษรเรียบร้อยแล้ว!</span>
+        </div>
+      )}
 
     </>
   );
