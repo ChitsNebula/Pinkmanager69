@@ -430,21 +430,11 @@ export function RegistryTab({
                 parts.forEach(part => {
                   const subParts = part.split(':').map(sp => sp.trim());
                   if (subParts.length >= 1) {
-                    const thDuty = subParts[0];
+                    const dutyKey = subParts[0];
                     const rawStatus = subParts[1] || 'อนุมัติแล้ว';
-                    
-                    let engDuty = 'staff';
-                    const thLower = thDuty.toLowerCase();
-                    if (thLower.includes('หลีด') || thLower.includes('cheer')) engDuty = 'cheerleader';
-                    else if (thLower.includes('ดรัม') || thLower.includes('drummer') || thLower.includes('major')) engDuty = 'drummer';
-                    else if (thLower.includes('ดุริยางค์') || thLower.includes('band') || thLower.includes('วงโย')) engDuty = 'band';
-                    else if (thLower.includes('กลอง') || thLower.includes('drum')) engDuty = 'drum';
-                    else if (thLower.includes('ถือป้าย')) engDuty = 'drum';
-                    else if (thLower.includes('สตาฟ') || thLower.includes('staff')) engDuty = 'staff';
-                    
                     const status = rawStatus.includes('รอคัดเลือก') || rawStatus.includes('รออนุมัติ') ? 'pending_selection' : 'approved';
-                    duties[engDuty] = status;
-                    assigned_duty = engDuty;
+                    duties[dutyKey] = status;
+                    assigned_duty = dutyKey;
                     duty_status = status;
                   }
                 });
